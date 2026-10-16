@@ -1,0 +1,84 @@
+# Tests every push and pull request. On main and on version tags it also builds
+# a multi-arch image (amd64 + arm64) and publishes it to GitHub Container Registry:
+#
+#   main         → ghcr.io/<owner>/wherebox:latest and :sha-<short>
+#   tag v1.2.3   → :1.2.3 and :1.2
+#
+# Optional repository settings:
+#   Variables  VITE_COFFEE_URL   Buy Me a Coffee link shown in Settings
+#   Secrets    DEPLOY_WEBHOOK    URL called after a main build (Watchtower, Portainer, Komodo…)
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+
+  image:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VITE_REPO_URL=${{ github.server_url }}/${{ github.repository }}
+            VITE_COFFEE_URL=${{ vars.VITE_COFFEE_URL || 'https://buymeacoffee.com/' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: image
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tell the home lab to pull the new image
+        env:
+          DEPLOY_WEBHOOK: ${{ secrets.DEPLOY_WEBHOOK }}
+        run: |
+          if [ -z "$DEPLOY_WEBHOOK" ]; then echo "No DEPLOY_WEBHOOK secret set, skipping."; exit 0; fi
+          curl -fsS -X POST "$DEPLOY_WEBHOOK"

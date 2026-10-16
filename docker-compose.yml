@@ -1,0 +1,29 @@
+# Home lab deployment. Point your Cloudflare Tunnel public hostname at
+# http://wherebox:8080 (if cloudflared shares the "tunnel" network) or at
+# http://<server-ip>:8080.
+#
+# Then:
+#   docker compose pull && docker compose up -d
+#
+# The image is public once you make the GitHub package public; until then run
+# `docker login ghcr.io` with a token that has read:packages.
+
+services:
+  wherebox:
+    image: ghcr.io/vidhyasagargm/wherebox:latest
+    container_name: wherebox
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    networks: [tunnel]
+
+networks:
+  # Use the same network your cloudflared container is on, or remove this.
+  tunnel:
+    name: tunnel
+    external: false
