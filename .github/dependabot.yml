@@ -1,14 +1,35 @@
-# Keeps npm packages, GitHub Actions and the Docker base images up to date.
+# Keeps packages, GitHub Actions and Docker base images up to date with one
+# grouped pull request per kind each month.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: monthly }
     groups:
-      all: { patterns: ['*'] }
+      npm:
+        patterns: ['*']
+    ignore:
+      # Majors that need a deliberate upgrade: TypeScript must match what
+      # svelte-check supports, @types/node must match the Node version we use.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
+    groups:
+      actions:
+        patterns: ['*']
+
   - package-ecosystem: docker
     directory: /
     schedule: { interval: monthly }
+    groups:
+      docker:
+        patterns: ['*']
+    ignore:
+      # Stay on Node LTS; move to the next LTS on purpose, not to odd releases.
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
