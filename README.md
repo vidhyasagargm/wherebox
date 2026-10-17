@@ -120,9 +120,9 @@ Since all data stays in each person's browser, the server holds nothing personal
 
 ## Support
 
-Wherebox is free, with no ads and no tracking. If it helps you, you can [buy me a coffee](https://buymeacoffee.com/your-name) ☕
+Wherebox is free, with no ads and no tracking. If it helps you, you can [buy me a coffee](https://buymeacoffee.com/vidhyasagar) ☕
 
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=000)](https://buymeacoffee.com/your-name)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=000)](https://buymeacoffee.com/vidhyasagar)
 
 ## Contributing
 
