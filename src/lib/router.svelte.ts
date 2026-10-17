@@ -18,8 +18,13 @@ const depth = () => (history.state?.depth as number | undefined) ?? 0
 function changed() {
   route.current = read()
   window.scrollTo(0, 0)
-  // Move focus to the new screen's heading for screen reader users.
-  queueMicrotask(() => document.querySelector<HTMLElement>('main h1')?.focus({ preventScroll: true }))
+  // Move focus to the new screen's heading for screen reader users, unless the screen
+  // already put the cursor somewhere useful (e.g. the "Where?" field after "I moved it").
+  queueMicrotask(() => {
+    const active = document.activeElement
+    if (active && active !== document.body && document.querySelector('main')?.contains(active) && active.tagName !== 'H1') return
+    document.querySelector<HTMLElement>('main h1')?.focus({ preventScroll: true })
+  })
 }
 
 if (typeof window !== 'undefined') window.addEventListener('popstate', changed)

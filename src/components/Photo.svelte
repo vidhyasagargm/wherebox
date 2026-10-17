@@ -1,14 +1,24 @@
 <script lang="ts">
-  let { blob, alt }: { blob: Blob; alt: string } = $props()
+  import { photoBlob, type StoredPhoto } from '../lib/db'
 
-  const url = $derived(URL.createObjectURL(blob))
+  let { photo, alt }: { photo: StoredPhoto | Blob; alt: string } = $props()
+
+  // A damaged photo shows nothing rather than breaking the screen.
+  const url = $derived.by(() => {
+    try {
+      const blob = photoBlob(photo)
+      return blob ? URL.createObjectURL(blob) : ''
+    } catch {
+      return ''
+    }
+  })
   $effect(() => {
     const current = url
-    return () => URL.revokeObjectURL(current)
+    return () => current && URL.revokeObjectURL(current)
   })
 </script>
 
-<img src={url} {alt} />
+{#if url}<img src={url} {alt} />{/if}
 
 <style>
   img {

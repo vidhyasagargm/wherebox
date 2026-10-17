@@ -115,7 +115,8 @@ nginx forwards only the API paths the app uses. The PocketBase dashboard and adm
 npm run backend        # PocketBase on :8090 with the Wherebox schema (binary in backend/.bin, see backend/PB_VERSION)
 npm run dev            # the app proxies /api to it
 npm run test:backend   # API tests against a real PocketBase
-npm run test:e2e       # sync, sharing and GDPR flows in real browsers (npx playwright install chromium)
+npm run test:e2e       # every section, sync, sharing and GDPR, through the real nginx.conf
+                       # (needs nginx; npx playwright install chromium webkit; E2E_BROWSER=webkit for Safari's engine)
 ```
 
 ## Contributing

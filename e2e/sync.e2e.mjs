@@ -72,7 +72,7 @@ test('sync between two devices', { timeout: 240_000 }, async () => {
 
     await a.p.goto(BASE + '/#/')
     await a.p.locator('.row-title', { hasText: 'Passport' }).click()
-    await a.p.locator('input[type=file]').setInputFiles(s.pngFile())
+    await a.p.locator('input[type=file]').setInputFiles(await s.jpegFile())
     await a.p.waitForTimeout(2500)
     check(
       'photo syncs to the other device',

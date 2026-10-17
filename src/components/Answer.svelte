@@ -28,7 +28,7 @@
       <button type="button" class="chip" onclick={() => talk(spoken.answer(item))}><Icon name="speaker" size={22} />{t('answer.sayAgain')}</button>
     {/if}
   </div>
-  {#if item.photo}<Photo blob={item.photo} alt={t('item.photoAlt', { name: item.name })} />{/if}
+  {#if item.photo}<Photo photo={item.photo} alt={t('item.photoAlt', { name: item.name })} />{/if}
   {#if item.note}<p class="note">{item.note}</p>{/if}
 </article>
 

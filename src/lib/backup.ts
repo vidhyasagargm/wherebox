@@ -1,4 +1,4 @@
-import { changed, db, isAccountList, newId, visible, type Item } from './db'
+import { changed, db, isAccountList, newId, photoBlob, storePhoto, visible, type Item } from './db'
 import { settings } from './settings.svelte'
 
 type BackupItem = Omit<Item, 'photo' | 'dirty' | 'deleted' | 'synced' | 'photoDirty' | 'photoName' | 'listId'> & { photo?: string }
@@ -25,7 +25,7 @@ export async function exportBackup(): Promise<void> {
     items: await Promise.all(
       items.map(async ({ photo, dirty: _d, deleted: _x, synced: _s, photoDirty: _p, photoName: _n, listId: _l, ...rest }) => ({
         ...rest,
-        ...(photo ? { photo: await toDataUrl(photo) } : {}),
+        ...(photo ? { photo: await toDataUrl(photoBlob(photo)!) } : {}),
       })),
     ),
     rooms,
@@ -66,7 +66,7 @@ export async function importBackup(backup: Backup): Promise<number> {
   for (const raw of backup.items) {
     if (typeof raw.id !== 'string' || typeof raw.name !== 'string' || typeof raw.where !== 'string') continue
     const { photo, ...rest } = raw
-    const image = photo ? await fromDataUrl(photo) : undefined
+    const image = photo ? await storePhoto(await fromDataUrl(photo)) : undefined
     items.push({
       ...rest,
       // Older backups used long ids the server doesn't accept.

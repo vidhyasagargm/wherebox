@@ -44,9 +44,14 @@ jobs:
           unzip -q /tmp/pb.zip pocketbase -d backend/.bin
           npm run test:backend
 
-  # The app in real browsers against a real backend: sync, sharing, GDPR flows.
+  # Every section of the app in real browsers, served by the real nginx.conf in front of a
+  # real backend: Chromium, and WebKit as an iPhone (Safari's engine).
   e2e:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -60,8 +65,11 @@ jobs:
           mkdir -p backend/.bin
           curl -fsSL -o /tmp/pb.zip "https://github.com/pocketbase/pocketbase/releases/download/v$V/pocketbase_${V}_linux_amd64.zip"
           unzip -q /tmp/pb.zip pocketbase -d backend/.bin
-      - run: npx playwright install --with-deps chromium
+      - run: sudo apt-get install -y --no-install-recommends nginx
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
       - run: npm run test:e2e
+        env:
+          E2E_BROWSER: ${{ matrix.browser }}
 
   # Pull requests build both images to catch Dockerfile problems; only pushes publish them.
   image:

@@ -30,7 +30,7 @@ test('GDPR features', { timeout: 300_000 }, async () => {
     await say(a.p, 'I put the passport in the bedroom drawer')
     await a.p.goto(BASE + '/#/')
     await a.p.locator('.row-title', { hasText: 'Passport' }).click()
-    await a.p.locator('input[type=file]').setInputFiles(s.pngFile())
+    await a.p.locator('input[type=file]').setInputFiles(await s.jpegFile())
     await a.p.waitForTimeout(2000)
 
     const o = await s.device()
@@ -51,9 +51,7 @@ test('GDPR features', { timeout: 300_000 }, async () => {
 
     await a.p.goto(BASE + '/#/settings')
     await a.p.waitForTimeout(400)
-    const [download] = await Promise.all([a.p.waitForEvent('download'), a.p.getByRole('button', { name: 'Download my data' }).click()])
-    const file = join(s.dir, 'my-data.json')
-    await download.saveAs(file)
+    const file = await s.savedFile(a.p, () => a.p.getByRole('button', { name: 'Download my data' }).click(), join(s.dir, 'my-data.json'))
     const data = JSON.parse(readFileSync(file, 'utf8'))
     check('export has account, lists and items', data.account.email === 'anna@test.local' && data.lists.length === 2 && data.items.length === 3)
     check('export includes the photo', data.items.some((i) => i.name === 'Passport' && String(i.photo).startsWith('data:image/')))

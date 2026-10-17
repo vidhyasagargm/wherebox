@@ -29,8 +29,10 @@
             <button
               type="button"
               onclick={() => {
+                // Take the action first: hiding the toast clears `current`.
+                const edit = current.edit
                 hideToast()
-                current.edit?.()
+                edit?.()
               }}>{t('edit')}</button>
           {/if}
         </div>

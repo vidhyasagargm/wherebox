@@ -78,6 +78,8 @@
   })
 </script>
 
+<!-- Any unexpected error in a screen shows a calm message instead of a blank app. -->
+<svelte:boundary onerror={(e) => console.error('screen failed', e)}>
 {#if data.storageError}
   <div class="screen">
     <main class="blocked">
@@ -116,6 +118,18 @@
   {/if}
   {#if !wide && tabs}<Nav />{/if}
 {/if}
+  {#snippet failed(_error, reset)}
+    <div class="screen">
+      <main class="blocked">
+        <span class="hint-icon"><Icon name="alert" size={30} stroke={2} /></span>
+        <h1 tabindex="-1">{t('app.crashed')}</h1>
+        <p class="muted">{t('app.crashedText')}</p>
+        <button type="button" class="btn btn-primary" onclick={() => location.reload()}>{t('app.reload')}</button>
+        <button type="button" class="btn-link" onclick={() => (go('', {}, true), reset())}>{t('nav.home')}</button>
+      </main>
+    </div>
+  {/snippet}
+</svelte:boundary>
 <Toast raised={!wide && tabs && !fullscreen} />
 
 <style>
