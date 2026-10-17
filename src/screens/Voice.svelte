@@ -4,6 +4,7 @@
   import TopBar from '../components/TopBar.svelte'
   import { speechLang, t } from '../lib/i18n'
   import { parse } from '../lib/parser'
+  import { isNative } from '../lib/platform'
   import { go } from '../lib/router.svelte'
   import { saveSettings, settings } from '../lib/settings.svelte'
   import { canListen, listen, type Session, type SpeechError } from '../lib/speech'
@@ -64,7 +65,7 @@
       <div class="center">
         <span class="notice-icon" aria-hidden="true"><Icon name="mic" size={30} stroke={2} /></span>
         <h1 tabindex="-1">{t('voiceNotice.title')}</h1>
-        <p class="muted lead">{t('voiceNotice.text')}</p>
+        <p class="muted lead">{t(isNative ? 'voiceNotice.textApp' : 'voiceNotice.text')}</p>
         <a href="#/privacy" class="more">{t('voiceNotice.more')}</a>
       </div>
       <div class="buttons">

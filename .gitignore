@@ -33,3 +33,7 @@ backend/pb_data
 # Hosting configuration (copy .env.example)
 .env
 restore/
+
+# App signing keys (see docs/apps.md): never commit these
+*.jks
+*.keystore

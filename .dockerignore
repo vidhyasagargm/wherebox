@@ -6,3 +6,5 @@ docker-compose.yml
 *.log
 .DS_Store
 backend
+android
+ios

@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Wherebox</string>
+    <string name="title_activity_main">Wherebox</string>
+    <string name="package_name">fyi.sagar.wherebox</string>
+    <string name="custom_url_scheme">fyi.sagar.wherebox</string>
+    <string name="shortcut_speak">Speak</string>
+    <string name="shortcut_places">Places</string>
+</resources>

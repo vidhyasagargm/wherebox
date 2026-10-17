@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app icon. Same as the website's manifest shortcuts. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="speak"
+        android:enabled="true"
+        android:icon="@drawable/shortcut_speak"
+        android:shortcutShortLabel="@string/shortcut_speak">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="wherebox://listen"
+            android:targetPackage="fyi.sagar.wherebox"
+            android:targetClass="fyi.sagar.wherebox.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="places"
+        android:enabled="true"
+        android:icon="@drawable/shortcut_places"
+        android:shortcutShortLabel="@string/shortcut_places">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="wherebox://places"
+            android:targetPackage="fyi.sagar.wherebox"
+            android:targetClass="fyi.sagar.wherebox.MainActivity" />
+    </shortcut>
+</shortcuts>

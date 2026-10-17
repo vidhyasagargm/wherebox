@@ -3,6 +3,7 @@
 // never use an account don't pay for it.
 import type PocketBase from 'pocketbase'
 import { db, isAccountList, LOCAL, moveAll } from './db'
+import { api, SERVER } from './platform'
 import { saveSettings, settings } from './settings.svelte'
 
 export type AccountUser = { id: string; email: string; name: string }
@@ -22,7 +23,7 @@ export const account = $state<{
 // Asks the server whether accounts exist here. Without a backend, sign-in stays hidden.
 export async function checkAvailable() {
   try {
-    const r = await fetch('/api/health', { signal: AbortSignal.timeout(4000) })
+    const r = await fetch(api('/api/health'), { signal: AbortSignal.timeout(4000) })
     account.available = r.ok
   } catch {
     account.available = false
@@ -38,7 +39,7 @@ let pb: PocketBase | null = null
 export async function client(): Promise<PocketBase> {
   if (pb) return pb
   const { default: PocketBase } = await import('pocketbase')
-  pb = new PocketBase(location.origin)
+  pb = new PocketBase(SERVER)
   // Requests overlap during sync; don't let the SDK cancel duplicates.
   pb.autoCancellation(false)
   return pb
@@ -81,7 +82,7 @@ export async function agreeToCurrent() {
 
 export async function consentVersion(): Promise<string> {
   try {
-    const r = await fetch('/api/wb/consent')
+    const r = await fetch(api('/api/wb/consent'))
     if (r.ok) return (await r.json()).version
   } catch {}
   return CONSENT_VERSION

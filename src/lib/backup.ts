@@ -1,4 +1,5 @@
 import { changed, db, isAccountList, newId, photoBlob, storePhoto, visible, type Item } from './db'
+import { isNative } from './platform'
 import { settings } from './settings.svelte'
 
 type BackupItem = Omit<Item, 'photo' | 'dirty' | 'deleted' | 'synced' | 'photoDirty' | 'photoName' | 'listId'> & { photo?: string }
@@ -36,6 +37,20 @@ export async function exportBackup(): Promise<void> {
 
 // Hands a file to the user: the share sheet on phones (Files, Drive, email…), a download elsewhere.
 export async function saveFile(file: File) {
+  // The phone apps' web view can't download: write the file to the app's cache and share it.
+  if (isNative) {
+    const [{ Filesystem, Directory }, { Share }] = await Promise.all([import('@capacitor/filesystem'), import('@capacitor/share')])
+    const data = (await toDataUrl(file)).split(',')[1]
+    const { uri } = await Filesystem.writeFile({ path: file.name, data, directory: Directory.Cache })
+    try {
+      await Share.share({ title: file.name, files: [uri] })
+    } catch (e) {
+      // Closing the share sheet isn't an error.
+      if (/cancel/i.test((e as Error).message)) throw Object.assign(new Error('cancelled'), { name: 'AbortError' })
+      throw e
+    }
+    return
+  }
   if (navigator.canShare?.({ files: [file] }) && matchMedia('(pointer: coarse)').matches) {
     try {
       await navigator.share({ files: [file], title: file.name })

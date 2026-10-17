@@ -1,9 +1,16 @@
 // Reads answers aloud with the browser's built-in text-to-speech. Most phones
 // use on-device voices, so this works offline and nothing leaves the device.
+// The phone apps use the system's text-to-speech through a plugin, since Android's
+// web view has no speechSynthesis.
 
-const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined
+import { isNative } from './platform'
 
-export const canTalk = () => !!synth
+const synth = typeof window !== 'undefined' && !isNative ? window.speechSynthesis : undefined
+
+// The module, not the plugin: a promise can't hold a Capacitor plugin (see speech.ts).
+const tts = () => import('@capacitor-community/text-to-speech')
+
+export const canTalk = () => isNative || !!synth
 
 let voices: SpeechSynthesisVoice[] = []
 const loadVoices = () => (voices = synth?.getVoices() ?? [])
@@ -23,6 +30,10 @@ function pickVoice(lang: string) {
 }
 
 export function say(text: string, lang: string) {
+  if (isNative && text) {
+    tts().then((m) => m.TextToSpeech.speak({ text, lang, rate: 0.95 })).catch(() => {})
+    return
+  }
   if (!synth || !text) return
   synth.cancel()
   const u = new SpeechSynthesisUtterance(text)
@@ -35,6 +46,7 @@ export function say(text: string, lang: string) {
 }
 
 export function hush() {
+  if (isNative) tts().then((m) => m.TextToSpeech.stop()).catch(() => {})
   synth?.cancel()
 }
 
