@@ -89,6 +89,7 @@ After the first build, open the package on GitHub (your profile › Packages ›
 Optional repository settings (Settings › Secrets and variables › Actions):
 
 - Variable `VITE_COFFEE_URL`: your Buy Me a Coffee link. The "See the code" link is filled in automatically.
+- Variable `VITE_IMPRINT`: your imprint (Impressum), lines separated by `|`, e.g. `Name | Street 1 | 12345 City | you@example.com`. Adds an Imprint link in Settings. Public sites run from Germany usually need one.
 - Secret `DEPLOY_WEBHOOK`: called after each `main` build, e.g. a Watchtower, Portainer or Komodo webhook, so the server pulls the new image.
 
 Dependabot (`.github/dependabot.yml`) opens a monthly pull request to keep packages, Actions and base images up to date.

@@ -8,7 +8,8 @@
   const show = $derived(!install.installed && settings.onboarded && Date.now() > settings.installDismissedUntil && (install.event || iosNeedsManualInstall()))
 
   function notNow() {
-    settings.installDismissedUntil = Date.now() + 14 * DAY
+    // On iPhone not installing risks losing data, so ask again sooner.
+    settings.installDismissedUntil = Date.now() + (iosNeedsManualInstall() ? 3 : 14) * DAY
     saveSettings()
   }
 </script>
@@ -25,6 +26,7 @@
     {#if install.event}
       <button type="button" class="btn btn-primary" onclick={promptInstall}><Icon name="download" />{t('install.button')}</button>
     {:else}
+      <p class="warn"><Icon name="alert" size={22} stroke={2} /><span>{t('ios.warning')}</span></p>
       <p class="ios"><Icon name="share" size={22} /><span>{t('install.ios')}</span></p>
     {/if}
     <button type="button" class="btn-link" onclick={notNow}>{t('install.notNow')}</button>
@@ -57,7 +59,16 @@
     background: var(--tint);
     color: var(--accent-text);
   }
-  .ios :global(svg) {
+  .warn {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .ios :global(svg),
+  .warn :global(svg) {
     flex-shrink: 0;
     margin-top: 1px;
   }

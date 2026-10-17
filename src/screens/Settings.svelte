@@ -10,6 +10,7 @@
   import { data, showToast } from '../lib/store.svelte'
 
   let fileInput: HTMLInputElement
+  const hasImprint = !!import.meta.env.VITE_IMPRINT
   let persisted = $state(false)
   const days = $derived(settings.lastBackup ? Math.floor((Date.now() - settings.lastBackup) / DAY) : null)
   const quickLink = `${location.origin}${location.pathname}#/listen`
@@ -182,6 +183,10 @@
           <a class="chip" href={import.meta.env.VITE_REPO_URL} target="_blank" rel="noopener"><Icon name="code" size={20} />{t('settings.code')}</a>
           <a class="chip coffee" href={import.meta.env.VITE_COFFEE_URL} target="_blank" rel="noopener"><Icon name="coffee" size={20} />{t('settings.coffee')}</a>
         </div>
+        <div class="legal">
+          <a href="#/privacy">{t('settings.privacy')}</a>
+          {#if hasImprint}<a href="#/privacy?imprint=1">{t('settings.imprint')}</a>{/if}
+        </div>
         <button type="button" class="btn-link" onclick={showIntro}>{t('settings.showIntro')}</button>
       </div>
     </section>
@@ -286,6 +291,17 @@
   .links a {
     text-decoration: none;
     color: var(--text);
+  }
+  .legal {
+    display: flex;
+    gap: 20px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .legal a {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
   }
   .coffee {
     background: #fff4d6;

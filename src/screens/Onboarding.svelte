@@ -2,6 +2,7 @@
   import Icon from '../components/Icon.svelte'
   import Logo from '../components/Logo.svelte'
   import { t } from '../lib/i18n'
+  import { iosNeedsManualInstall } from '../lib/install.svelte'
   import { go } from '../lib/router.svelte'
   import { saveSettings, settings } from '../lib/settings.svelte'
 
@@ -43,6 +44,9 @@
     <div class="copy">
       <h1 tabindex="-1">{t(`onb.${step as 1 | 2 | 3}.title`)}</h1>
       <p class="muted">{t(`onb.${step as 1 | 2 | 3}.text`)}</p>
+      {#if step === 3 && iosNeedsManualInstall()}
+        <p class="ios"><Icon name="alert" size={22} stroke={2} /><span>{t('ios.warning')} {t('install.ios')}</span></p>
+      {/if}
     </div>
     <div class="dots" aria-hidden="true">
       {#each [1, 2, 3] as n (n)}<span class:on={n === step}></span>{/each}
@@ -57,7 +61,7 @@
   }
   .art {
     flex: 1;
-    min-height: 260px;
+    min-height: 200px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -151,6 +155,22 @@
   .copy p {
     font-size: 19px;
     line-height: 1.5;
+  }
+  .ios {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: var(--tint);
+    color: var(--accent-text);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+  .ios :global(svg) {
+    flex-shrink: 0;
+    margin-top: 1px;
   }
   .dots {
     display: flex;

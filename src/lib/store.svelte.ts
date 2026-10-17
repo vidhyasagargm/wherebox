@@ -6,13 +6,30 @@ import { parse, splitPlace } from './parser'
 import { go } from './router.svelte'
 import { settings } from './settings.svelte'
 
-export const data = $state<{ items: Item[]; rooms: string[]; loaded: boolean }>({ items: [], rooms: [], loaded: false })
-
-liveQuery(() => db.items.orderBy('updatedAt').reverse().toArray()).subscribe((items) => {
-  data.items = items
-  data.loaded = true
+export const data = $state<{ items: Item[]; rooms: string[]; loaded: boolean; storageError: boolean }>({
+  items: [],
+  rooms: [],
+  loaded: false,
+  storageError: false,
 })
-liveQuery(() => db.rooms.toArray()).subscribe((rooms) => (data.rooms = rooms.map((r) => r.name)))
+
+// Private windows and strict privacy settings can block IndexedDB entirely.
+const blocked = () => {
+  data.storageError = true
+  data.loaded = true
+}
+
+// Live queries stay silent when the database can't open, so check it directly.
+db.open().catch(blocked)
+
+liveQuery(() => db.items.orderBy('updatedAt').reverse().toArray()).subscribe({
+  next: (items) => {
+    data.items = items
+    data.loaded = true
+  },
+  error: blocked,
+})
+liveQuery(() => db.rooms.toArray()).subscribe({ next: (rooms) => (data.rooms = rooms.map((r) => r.name)), error: blocked })
 
 export type Toast = { id: number; title: string; text?: string; undo?: () => Promise<void>; edit?: () => void }
 

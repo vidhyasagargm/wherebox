@@ -6,17 +6,18 @@
   import { t } from './lib/i18n'
   import { go, route } from './lib/router.svelte'
   import { applyTheme, settings } from './lib/settings.svelte'
-  import { hideToast, toast } from './lib/store.svelte'
+  import { data, hideToast, toast } from './lib/store.svelte'
   import Confirm from './screens/Confirm.svelte'
   import Find from './screens/Find.svelte'
   import Home from './screens/Home.svelte'
   import ItemDetail from './screens/ItemDetail.svelte'
   import Onboarding from './screens/Onboarding.svelte'
   import Places from './screens/Places.svelte'
+  import Privacy from './screens/Privacy.svelte'
   import Settings from './screens/Settings.svelte'
   import Voice from './screens/Voice.svelte'
 
-  const screens = { find: Find, item: ItemDetail, confirm: Confirm, places: Places, settings: Settings, listen: Voice, welcome: Onboarding }
+  const screens = { find: Find, item: ItemDetail, confirm: Confirm, places: Places, settings: Settings, listen: Voice, welcome: Onboarding, privacy: Privacy }
   // On wide screens these open beside Home instead of replacing it.
   const sideBySide = new Set(['home', 'find', 'item', 'confirm'])
 
@@ -69,7 +70,16 @@
   })
 </script>
 
-{#if fullscreen}
+{#if data.storageError}
+  <div class="screen">
+    <main class="blocked">
+      <span class="hint-icon"><Icon name="alert" size={30} stroke={2} /></span>
+      <h1 tabindex="-1">{t('storage.title')}</h1>
+      <p class="muted">{t('storage.text')}</p>
+      <button type="button" class="btn btn-primary" onclick={() => location.reload()}>{t('storage.retry')}</button>
+    </main>
+  </div>
+{:else if fullscreen}
   <Screen />
 {:else}
   {#if wide}<Nav />{/if}
@@ -99,6 +109,13 @@
 <Toast raised={!wide && tabs && !fullscreen} />
 
 <style>
+  .blocked {
+    justify-content: center;
+  }
+  .blocked p {
+    font-size: 18px;
+    line-height: 1.5;
+  }
   .home-main {
     padding-bottom: calc(var(--nav-h) + 24px) !important;
   }

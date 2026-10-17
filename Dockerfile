@@ -6,10 +6,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY . .
-# Public links shown in Settings › About; override with --build-arg.
+# Links and imprint shown in Settings › About; set with --build-arg.
 ARG VITE_REPO_URL
 ARG VITE_COFFEE_URL
-ENV VITE_REPO_URL=${VITE_REPO_URL} VITE_COFFEE_URL=${VITE_COFFEE_URL}
+ARG VITE_IMPRINT
+ENV VITE_REPO_URL=${VITE_REPO_URL} VITE_COFFEE_URL=${VITE_COFFEE_URL} VITE_IMPRINT=${VITE_IMPRINT}
 RUN npm test && npm run build
 
 # --- Serve it: unprivileged nginx, listens on 8080 ---

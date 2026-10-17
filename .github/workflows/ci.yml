@@ -6,6 +6,7 @@
 #
 # Optional repository settings:
 #   Variables  VITE_COFFEE_URL   Buy Me a Coffee link shown in Settings
+#              VITE_IMPRINT      Imprint lines separated by | (name | street | city | email)
 #   Secrets    DEPLOY_WEBHOOK    URL called after a main build (Watchtower, Portainer, Komodo…)
 
 name: CI
@@ -68,6 +69,7 @@ jobs:
           build-args: |
             VITE_REPO_URL=${{ github.server_url }}/${{ github.repository }}
             VITE_COFFEE_URL=${{ vars.VITE_COFFEE_URL || 'https://buymeacoffee.com/' }}
+            VITE_IMPRINT=${{ vars.VITE_IMPRINT }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
