@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 
 # --- Build the static site ---
-FROM node:22-alpine AS build
+# The site is the same files on every platform, so build it once on the build machine's own
+# architecture (no slow emulation for arm64). Tests run in CI before images are built.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
@@ -11,7 +13,7 @@ ARG VITE_REPO_URL
 ARG VITE_COFFEE_URL
 ARG VITE_IMPRINT
 ENV VITE_REPO_URL=${VITE_REPO_URL} VITE_COFFEE_URL=${VITE_COFFEE_URL} VITE_IMPRINT=${VITE_IMPRINT}
-RUN npm test && npm run build
+RUN npm run build
 
 # --- Serve it: unprivileged nginx, listens on 8080 ---
 FROM nginxinc/nginx-unprivileged:1.29-alpine
