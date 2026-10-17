@@ -5,12 +5,12 @@
   import { speechLang, t } from '../lib/i18n'
   import { parse } from '../lib/parser'
   import { go } from '../lib/router.svelte'
-  import { settings } from '../lib/settings.svelte'
+  import { saveSettings, settings } from '../lib/settings.svelte'
   import { canListen, listen, type Session, type SpeechError } from '../lib/speech'
   import { handle } from '../lib/store.svelte'
   import { hush, unlockTalk } from '../lib/talk'
 
-  type Phase = { name: 'listening' } | { name: 'working'; text: string } | { name: 'error'; error: SpeechError }
+  type Phase = { name: 'notice' } | { name: 'listening' } | { name: 'working'; text: string } | { name: 'error'; error: SpeechError }
 
   let phase = $state<Phase>({ name: 'listening' })
   let transcript = $state('')
@@ -42,6 +42,8 @@
 
   onMount(() => {
     if (!canListen()) go('', { dictate: '1' }, true)
+    // Explain once where the voice goes before the microphone is used for the first time.
+    else if (!settings.voiceNoticeSeen) phase = { name: 'notice' }
     else start()
   })
   onDestroy(() => session?.abort())
@@ -58,7 +60,25 @@
 <div class="screen voice">
   <TopBar icon="close" />
   <main>
-    {#if phase.name === 'listening'}
+    {#if phase.name === 'notice'}
+      <div class="center">
+        <span class="notice-icon" aria-hidden="true"><Icon name="mic" size={30} stroke={2} /></span>
+        <h1 tabindex="-1">{t('voiceNotice.title')}</h1>
+        <p class="muted lead">{t('voiceNotice.text')}</p>
+        <a href="#/privacy" class="more">{t('voiceNotice.more')}</a>
+      </div>
+      <div class="buttons">
+        <button
+          type="button"
+          class="btn btn-primary"
+          onclick={() => {
+            settings.voiceNoticeSeen = true
+            saveSettings()
+            start()
+          }}><Icon name="mic" />{t('voiceNotice.ok')}</button>
+        <button type="button" class="btn" onclick={() => go('', {}, true)}>{t('voice.typeInstead')}</button>
+      </div>
+    {:else if phase.name === 'listening'}
       <div class="center">
         <span class="status" role="status"><span class="dot"></span>{t('voice.listening')}</span>
         <h1 tabindex="-1" class="said" aria-live="polite">
@@ -177,6 +197,23 @@
     color: var(--muted);
     box-shadow: none;
     animation: none;
+  }
+  .notice-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    background: var(--tint);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .more {
+    font-size: 17px;
+    font-weight: 600;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
   }
   .buttons {
     display: flex;

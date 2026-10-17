@@ -10,6 +10,7 @@ type Settings = {
   theme: Theme
   readAloud: ReadAloud
   onboarded: boolean
+  voiceNoticeSeen: boolean
   lastBackup: number | null
   backupSnoozedUntil: number
   installDismissedUntil: number
@@ -24,6 +25,7 @@ const defaults: Settings = {
   theme: 'system',
   readAloud: 'voice',
   onboarded: false,
+  voiceNoticeSeen: false,
   lastBackup: null,
   backupSnoozedUntil: 0,
   installDismissedUntil: 0,

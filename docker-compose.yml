@@ -20,6 +20,12 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
+    # Keep only a little log history (the logs contain no IP addresses).
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "2"
     networks: [tunnel]
 
 networks:
