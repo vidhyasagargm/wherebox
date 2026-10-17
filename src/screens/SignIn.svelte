@@ -43,7 +43,7 @@
     }
     waiting = true
     try {
-      otpId = await requestCode(email.trim().toLowerCase(), name.trim())
+      otpId = await requestCode(email.trim().toLowerCase())
       code = ''
       step = 'code'
       queueMicrotask(() => codeInput?.focus())
@@ -60,7 +60,7 @@
     if (code.replace(/\D/g, '').length < 6) return codeInput?.focus()
     waiting = true
     try {
-      listId = (await verifyCode(otpId, code)).id
+      listId = (await verifyCode(otpId, code, name.trim())).id
       toMove = await localCount()
       if (toMove > 0) step = 'move'
       else finish()

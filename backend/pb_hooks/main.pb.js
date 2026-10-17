@@ -39,23 +39,47 @@ onBootstrap((e) => {
 
 // --- Sign-up: an emailed code for an unknown address creates the account, but only with consent ---
 onRecordRequestOTPRequest((e) => {
-  if (!e.record) {
-    const body = e.requestInfo().body || {}
-    const email = String(body.email || '').trim().toLowerCase()
-    // Without explicit consent nothing is created and no email is sent.
-    // PocketBase still answers with an otpId, so the response doesn't reveal whether an account exists.
-    if (body.consent === true && email) {
-      const user = new Record(e.collection)
-      user.setEmail(email)
-      user.setRandomPassword()
-      user.setEmailVisibility(false)
-      user.setVerified(false)
-      user.set('name', String(body.name || '').trim().slice(0, 50))
-      user.set('consentAt', new Date().toISOString())
-      user.set('consentVersion', String(body.consentVersion || ''))
-      e.app.save(user)
-      e.record = user
-    }
+  const body = e.requestInfo().body || {}
+  const email = String(body.email || '').trim().toLowerCase()
+
+  // At most 1 code per address per minute and 5 per hour, so nobody can flood someone's
+  // inbox or use up the email quota through one address (per-IP limits apply as well).
+  // (WB_TEST_NO_ADDRESS_LIMIT is only for the test suite, which signs in the same people many times.)
+  if ($os.getenv('WB_TEST_NO_ADDRESS_LIMIT') !== 'true') {
+    const key = 'wb-otp:' + email
+    const now = Date.now()
+    const recent = (e.app.store().get(key) || []).filter((t) => now - t < 3600000)
+    if (recent.some((t) => now - t < 60000) || recent.length >= 5) throw new TooManyRequestsError('Please wait a moment before asking for another code.')
+    e.app.store().set(key, [...recent, now])
+  }
+
+  if (!e.record && body.consent === true && email) {
+    // Without consent nothing is created and no email is sent. PocketBase still answers
+    // with an otpId, so the response doesn't reveal whether an account exists.
+    // Anyone can ask for a code for any address, so nothing from this request is kept:
+    // name and consent are recorded when the owner of the address signs in with the code.
+    const user = new Record(e.collection)
+    user.setEmail(email)
+    user.setRandomPassword()
+    user.setEmailVisibility(false)
+    user.setVerified(false)
+    e.app.save(user)
+    e.record = user
+  }
+  e.next()
+}, 'users')
+
+// --- First sign-in completes the account: consent and name come from the person who has the code ---
+onRecordAuthWithOTPRequest((e) => {
+  const wb = require(`${__hooks}/lib/wb.js`)
+  const firstTime = e.record && !e.record.verified()
+  const body = e.requestInfo().body || {}
+  if (firstTime && body.consent !== true) throw new BadRequestError('Please agree to the terms to create your account.')
+  if (firstTime) {
+    // Saved by PocketBase together with "verified", and only if the code is right.
+    e.record.set('consentAt', new Date().toISOString())
+    e.record.set('consentVersion', wb.CONSENT_VERSION)
+    e.record.set('name', String(body.name || '').trim().slice(0, 50))
   }
   e.next()
 }, 'users')

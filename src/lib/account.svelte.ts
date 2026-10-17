@@ -70,7 +70,7 @@ export async function restoreSession() {
 export async function checkConsent(record: { [key: string]: unknown }) {
   const current = await consentVersion()
   const agreed = typeof record.consentVersion === 'string' ? record.consentVersion : ''
-  account.needsConsent = !!agreed && agreed !== current
+  account.needsConsent = agreed !== current
 }
 
 export async function agreeToCurrent() {
@@ -87,17 +87,18 @@ export async function consentVersion(): Promise<string> {
   return CONSENT_VERSION
 }
 
-export async function requestCode(email: string, name: string): Promise<string> {
+export async function requestCode(email: string): Promise<string> {
   const c = await client()
-  const version = await consentVersion()
   // The consent flag lets the server create an account for a new address; existing accounts just get a code.
-  const r = await c.collection('users').requestOTP(email, { body: { email, consent: true, consentVersion: version, name } })
+  const r = await c.collection('users').requestOTP(email, { body: { email, consent: true } })
   return r.otpId
 }
 
-export async function verifyCode(otpId: string, code: string) {
+// Consent and name are sent with the code, so only the owner of the address can set them.
+export async function verifyCode(otpId: string, code: string, name = '') {
   const c = await client()
-  const auth = await c.collection('users').authWithOTP(otpId, code.replace(/\D/g, ''))
+  const password = code.replace(/\D/g, '')
+  const auth = await c.collection('users').authWithOTP(otpId, password, { body: { otpId, password, consent: true, name } })
   account.user = toUser(auth.record)
   account.expired = false
   await checkConsent(auth.record)

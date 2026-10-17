@@ -73,7 +73,7 @@ export async function startStack({ pbPort = 8090, vitePort = 5180, smtpPort = 25
   execFileSync(PB, ['migrate', 'up', ...args], { stdio: 'pipe' })
   execFileSync(PB, ['superuser', 'upsert', ADMIN.email, ADMIN.password, ...args], { stdio: 'pipe' })
   const pb = spawn(PB, ['serve', '--http', `127.0.0.1:${pbPort}`, ...args], {
-    env: { ...process.env, SMTP_HOST: '127.0.0.1', SMTP_PORT: String(smtpPort), SMTP_FROM: 'noreply@test.local' },
+    env: { ...process.env, SMTP_HOST: '127.0.0.1', SMTP_PORT: String(smtpPort), SMTP_FROM: 'noreply@test.local', WB_TEST_NO_ADDRESS_LIMIT: 'true' },
     stdio: 'ignore',
   })
   const vite = spawn('npx', ['vite', '--port', String(vitePort), '--strictPort'], {
