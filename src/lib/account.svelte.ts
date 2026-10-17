@@ -15,7 +15,19 @@ export const account = $state<{
   expired: boolean
   // The privacy notice or terms changed since this account agreed; asked before continuing.
   needsConsent: boolean
-}>({ user: null, status: 'idle', lastSync: null, expired: false, needsConsent: false })
+  // Whether this server offers accounts at all. Hosts can run the app without a backend.
+  available: boolean
+}>({ user: null, status: 'idle', lastSync: null, expired: false, needsConsent: false, available: false })
+
+// Asks the server whether accounts exist here. Without a backend, sign-in stays hidden.
+export async function checkAvailable() {
+  try {
+    const r = await fetch('/api/health', { signal: AbortSignal.timeout(4000) })
+    account.available = r.ok
+  } catch {
+    account.available = false
+  }
+}
 
 const AUTH_KEY = 'pocketbase_auth'
 // Fallback if the server can't be asked; must match the server's CONSENT_VERSION.
@@ -40,7 +52,13 @@ export async function restoreSession() {
   try {
     saved = !!localStorage.getItem(AUTH_KEY)
   } catch {}
-  if (!saved) return
+  if (!saved) {
+    await checkAvailable()
+    // Offline at start: look again once there's a connection.
+    if (!account.available) addEventListener('online', checkAvailable, { once: true })
+    return
+  }
+  account.available = true
   const c = await client()
   if (!c.authStore.record) return
   account.user = toUser(c.authStore.record)

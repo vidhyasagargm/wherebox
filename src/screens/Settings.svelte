@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import AccountCard from '../components/AccountCard.svelte'
+  import { account } from '../lib/account.svelte'
   import { isAccountList } from '../lib/db'
   import Icon from '../components/Icon.svelte'
   import { exportBackup, importBackup, readBackup } from '../lib/backup'
@@ -92,10 +93,12 @@
   <main>
     <h1 tabindex="-1" class="title">{t('settings.title')}</h1>
 
-    <section aria-labelledby="acct">
-      <h2 id="acct">{t('account.title')}</h2>
-      <AccountCard />
-    </section>
+    {#if account.user || account.available}
+      <section aria-labelledby="acct">
+        <h2 id="acct">{t('account.title')}</h2>
+        <AccountCard />
+      </section>
+    {/if}
 
     <section aria-labelledby="backup">
       <h2 id="backup">{t('settings.backup')}</h2>
@@ -191,8 +194,8 @@
       <div class="card about">
         <p>{t('settings.aboutText', { v: __APP_VERSION__ })}</p>
         <div class="links">
-          <a class="chip" href={import.meta.env.VITE_REPO_URL} target="_blank" rel="noopener"><Icon name="code" size={20} />{t('settings.code')}</a>
-          <a class="chip coffee" href={import.meta.env.VITE_COFFEE_URL} target="_blank" rel="noopener"><Icon name="coffee" size={20} />{t('settings.coffee')}</a>
+          <a class="chip" href={import.meta.env.VITE_REPO_URL || 'https://github.com/vidhyasagargm/wherebox'} target="_blank" rel="noopener"><Icon name="code" size={20} />{t('settings.code')}</a>
+          <a class="chip coffee" href={import.meta.env.VITE_COFFEE_URL || 'https://buymeacoffee.com/vidhyasagar'} target="_blank" rel="noopener"><Icon name="coffee" size={20} />{t('settings.coffee')}</a>
         </div>
         <div class="legal">
           <a href="#/privacy">{t('settings.privacy')}</a>

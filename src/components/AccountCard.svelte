@@ -68,7 +68,7 @@
       <a class="btn btn-danger" href="#/delete-account"><Icon name="trash" />{t('data.delete')}</a>
     </div>
     <button type="button" class="btn-link" onclick={out}>{t('account.signOut')}</button>
-  {:else}
+  {:else if account.available}
     <p class="pitch">{t('account.pitch')}</p>
     <a class="btn btn-primary" href="#/signin"><Icon name="cloud" />{t('account.signIn')}</a>
   {/if}

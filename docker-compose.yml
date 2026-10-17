@@ -1,43 +1,52 @@
-# Home lab deployment. Point your Cloudflare Tunnel public hostname at
-# http://wherebox:8080 (if cloudflared shares the "tunnel" network) or at
-# http://<server-ip>:8080.
+# Wherebox. Configure everything in .env (copy .env.example), then:
+#   docker compose up -d
 #
-# Then:
-#   docker compose pull && docker compose up -d
+# COMPOSE_PROFILES in .env decides what runs:
+#   (empty)          app only, no accounts
+#   accounts         + PocketBase backend for sync and sharing
+#   accounts,backup  + encrypted offsite backups
 #
-# The image is public once you make the GitHub package public; until then run
-# `docker login ghcr.io` with a token that has read:packages.
+# The app listens on http://<this machine>:${WHEREBOX_PORT:-8080}. Put HTTPS in front
+# (Cloudflare Tunnel, Caddy, Tailscale…): phones only allow install, offline use and
+# the microphone on https:// addresses. See docs/self-hosting.md.
 
 services:
   wherebox:
-    image: ghcr.io/vidhyasagargm/wherebox:latest
+    image: ghcr.io/vidhyasagargm/wherebox:${WHEREBOX_VERSION:-latest}
     container_name: wherebox
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${WHEREBOX_PORT:-8080}:8080"
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
-    # Keep only a little log history (the logs contain no IP addresses).
-    logging:
+    logging: &logging
       driver: json-file
       options:
         max-size: "1m"
         max-file: "2"
-    networks: [tunnel]
 
   pocketbase:
-    image: ghcr.io/vidhyasagargm/wherebox-backend:latest
+    profiles: [accounts]
+    image: ghcr.io/vidhyasagargm/wherebox-backend:${WHEREBOX_VERSION:-latest}
     container_name: wherebox-backend
     restart: unless-stopped
-    # Settings for sending sign-in emails (Brevo) and the public address. See backend.env.example.
-    env_file: backend.env
+    environment:
+      WB_APP_URL: ${WB_APP_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_TLS: ${SMTP_TLS:-false}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Wherebox}
+      WB_LOG_SIGNIN_CODES: ${WB_LOG_SIGNIN_CODES:-false}
     volumes:
       - pb_data:/pb_data
     # The admin dashboard is only reachable from this machine:
-    #   ssh -L 8090:127.0.0.1:8090 you@server  →  http://localhost:8090/_/
+    #   ssh -L 8090:127.0.0.1:8090 you@server   then open http://localhost:8090/_/
     ports:
       - "127.0.0.1:8090:8090"
     read_only: true
@@ -45,18 +54,29 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
-    logging:
-      driver: json-file
-      options:
-        max-size: "1m"
-        max-file: "2"
-    networks: [tunnel]
+    logging: *logging
+
+  backup:
+    profiles: [backup]
+    image: restic/restic:0.18.1
+    container_name: wherebox-backup
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/scripts/backup.sh"]
+    environment:
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:-}
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      BACKUP_TIME: ${BACKUP_TIME:-03:15}
+    volumes:
+      # PocketBase writes a consistent snapshot here every night; only these are copied.
+      - pb_data:/pb_data:ro
+      - ./scripts:/scripts:ro
+      - restic_cache:/root/.cache/restic
+      # For an sftp: repository, mount an SSH key, e.g.
+      # - ~/.ssh/wherebox_backup:/root/.ssh/id_ed25519:ro
+    logging: *logging
 
 volumes:
   pb_data:
-
-networks:
-  # Use the same network your cloudflared container is on, or remove this.
-  tunnel:
-    name: tunnel
-    external: false
+  restic_cache:

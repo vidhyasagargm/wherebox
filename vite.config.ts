@@ -11,7 +11,7 @@ export default defineConfig({
   // App unit tests only; the backend has its own runner (npm run test:backend).
   test: { include: ['src/**/*.test.ts'] },
   // In development, API calls go to a local PocketBase (npm run backend).
-  server: { proxy: { '/api': { target: 'http://127.0.0.1:8090', changeOrigin: false } } },
+  server: { proxy: { '/api': { target: process.env.WB_API_TARGET ?? 'http://127.0.0.1:8090', changeOrigin: false } } },
   plugins: [
     svelte(),
     VitePWA({

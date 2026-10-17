@@ -77,7 +77,7 @@
 
     {#if account.user}
       <button type="button" class="btn" onclick={() => dialog.showModal()}><Icon name="plus" />{t('lists.new')}</button>
-    {:else}
+    {:else if account.available}
       <div class="card hint">
         <p>{t('lists.signInHint')}</p>
         <a class="btn" href="#/signin"><Icon name="cloud" />{t('account.signIn')}</a>

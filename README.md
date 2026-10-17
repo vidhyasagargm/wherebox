@@ -2,7 +2,8 @@
 
 Remember where you put things. Tell it, by typing or speaking, *"I put the passport in the bedroom drawer"*, and later ask *"Where is my passport?"*.
 
-- **Local-first.** Everything lives on your device (IndexedDB). No account, no server-side data, no tracking.
+- **Local-first.** Everything lives on your device (IndexedDB) and works without an account. No tracking.
+- **Optional accounts.** Sign in with an emailed code to sync between devices and share lists with family, with view-only or edit access.
 - **Works offline.** Installable PWA for Android, iPhone and desktop.
 - **English and German.** Understands both, whatever language the app is set to.
 - **Made for everyone.** Large tap targets, high contrast, one-handed use, screen-reader friendly.
@@ -21,6 +22,9 @@ Remember where you put things. Tell it, by typing or speaking, *"I put the passp
 | Item detail | Photo of the spot, note, history timeline |
 | Backup | Export/import a JSON file (photos included); gentle reminder after 30 days; asks the browser for persistent storage |
 | Undo | Every save shows a toast with Undo and Edit |
+| Read aloud | Answers to spoken questions are spoken back, using the device's own voice |
+| Sync and share (optional) | Offline-first sync with live updates; several lists; invite links with roles; view-only mode |
+| Your data | Download everything incl. photos; delete your account; privacy notice and terms in EN/DE |
 
 ## Why this stack
 
@@ -75,48 +79,21 @@ src/
   components/        Nav, Toast, banners, icons
 ```
 
-## Deploy (home lab + GitHub + Cloudflare Tunnel)
+## Hosting
 
-### 1. GitHub builds the image
+Anyone can host Wherebox (MIT licence). One `docker-compose.yml` and one `.env` cover three setups:
 
-Push to GitHub. `.github/workflows/ci.yml` tests every push and pull request. On `main` and on version tags it builds a multi-arch image (amd64 + arm64, so it runs on a Raspberry Pi too) and publishes it to GitHub Container Registry:
+| | |
+|---|---|
+| **App only** | One container, no configuration. Lists stay on each device; sign-in is hidden. |
+| **Accounts at home** | + sync and sharing for your household. No email service needed: sign-in codes appear in the server log (private networks only). |
+| **Accounts in public** | + sign-in by email through any SMTP provider, and encrypted offsite backups with a restore test. |
 
-- `main` → `ghcr.io/<you>/wherebox:latest`
-- tag `v1.2.0` → `:1.2.0` and `:1.2`
+Images for amd64 and arm64 are published to `ghcr.io/vidhyasagargm/wherebox` and `ghcr.io/vidhyasagargm/wherebox-backend` on every push to `main`.
 
-After the first build, open the package on GitHub (your profile › Packages › wherebox › Package settings) and set **visibility to Public**. Then anyone, including your server, can pull it without logging in.
-
-Optional repository settings (Settings › Secrets and variables › Actions):
-
-- Variable `VITE_COFFEE_URL`: your Buy Me a Coffee link. The "See the code" link is filled in automatically.
-- Variable `VITE_IMPRINT`: your imprint (Impressum), lines separated by `|`, e.g. `Name | Street 1 | 12345 City | you@example.com`. Adds an Imprint link in Settings. Public sites run from Germany usually need one.
-- Secret `DEPLOY_WEBHOOK`: called after each `main` build, e.g. a Watchtower, Portainer or Komodo webhook, so the server pulls the new image.
-
-Dependabot (`.github/dependabot.yml`) opens a monthly pull request to keep packages, Actions and base images up to date.
-
-### 2. Run it on the server
-
-Edit the image path in `docker-compose.yml`, then:
-
-```bash
-docker compose pull && docker compose up -d
-curl http://localhost:8080/healthz   # → ok
-```
-
-The container is unprivileged nginx on port 8080, with a read-only filesystem.
-
-### 3. Cloudflare Tunnel
-
-Add a public hostname (e.g. `wherebox.example.com`) → service `http://wherebox:8080` if cloudflared runs in the same Docker network, otherwise `http://<server-ip>:8080`.
-
-Cloudflare settings that matter for a PWA:
-
-- **HTTPS is required** for install, service worker and microphone. The tunnel provides it.
-- **Don't edge-cache `sw.js`, `index.html` or `manifest.webmanifest`.** nginx sends `Cache-Control: no-cache` for them, which Cloudflare respects by default. If you've added a "Cache Everything" rule, exclude these paths, or users get stuck on old versions.
-- **Turn off Rocket Loader** for this hostname. It rewrites scripts and breaks the strict Content-Security-Policy.
-- **Don't put Cloudflare Access (login) in front of it**, unless you want it private. Installed PWAs handle the Access login redirect badly.
-
-Since all data stays in each person's browser, the server holds nothing personal. Backups are the user's own JSON files.
+- **[docs/self-hosting.md](docs/self-hosting.md)**: hosting your own copy
+- **[docs/deploy.md](docs/deploy.md)**: the steps for wherebox.sagar.fyi (Brevo, Cloudflare Tunnel, backups)
+- **[docs/gdpr/](docs/gdpr/)**: what you need as the operator of a public instance in the EU
 
 ## Support
 
@@ -124,7 +101,7 @@ Wherebox is free, with no ads and no tracking. If it helps you, you can [buy me 
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=000)](https://buymeacoffee.com/vidhyasagar)
 
-## Accounts and sharing (in development)
+## Accounts and sharing
 
 Optional accounts add sync across devices and shared lists. The backend in `backend/` is [PocketBase](https://pocketbase.io) with:
 
@@ -135,7 +112,10 @@ Optional accounts add sync across devices and shared lists. The backend in `back
 nginx forwards only the API paths the app uses. The PocketBase dashboard and admin API are not reachable from the internet.
 
 ```bash
-npm run test:backend   # needs the PocketBase binary in backend/.bin (see backend/PB_VERSION)
+npm run backend        # PocketBase on :8090 with the Wherebox schema (binary in backend/.bin, see backend/PB_VERSION)
+npm run dev            # the app proxies /api to it
+npm run test:backend   # API tests against a real PocketBase
+npm run test:e2e       # sync, sharing and GDPR flows in real browsers (npx playwright install chromium)
 ```
 
 ## Contributing

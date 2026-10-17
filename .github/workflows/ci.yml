@@ -43,9 +43,28 @@ jobs:
           unzip -q /tmp/pb.zip pocketbase -d backend/.bin
           npm run test:backend
 
+  # The app in real browsers against a real backend: sync, sharing, GDPR flows.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: PocketBase
+        run: |
+          V=$(cat backend/PB_VERSION)
+          mkdir -p backend/.bin
+          curl -fsSL -o /tmp/pb.zip "https://github.com/pocketbase/pocketbase/releases/download/v$V/pocketbase_${V}_linux_amd64.zip"
+          unzip -q /tmp/pb.zip pocketbase -d backend/.bin
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
   # Pull requests build both images to catch Dockerfile problems; only pushes publish them.
   image:
-    needs: test
+    needs: [test, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read

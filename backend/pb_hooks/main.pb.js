@@ -23,6 +23,20 @@ onBootstrap((e) => {
   e.app.save(s)
 })
 
+// --- Local mode without email: print sign-in codes in the server log ---
+// For a home network or testing only (WB_LOG_SIGNIN_CODES=true). Anyone who can read the
+// server log can sign in as anyone, so never enable it on a public server.
+onMailerRecordOTPSend((e) => {
+  if ($os.getenv('WB_LOG_SIGNIN_CODES') !== 'true') return e.next()
+  console.log(`[wherebox] sign-in code for ${e.record.email()}: ${e.meta.password}`)
+})
+
+onBootstrap((e) => {
+  e.next()
+  if ($os.getenv('WB_LOG_SIGNIN_CODES') === 'true')
+    console.log('[wherebox] WB_LOG_SIGNIN_CODES is on: sign-in codes are printed here instead of emailed. Use only on a private network.')
+})
+
 // --- Sign-up: an emailed code for an unknown address creates the account, but only with consent ---
 onRecordRequestOTPRequest((e) => {
   if (!e.record) {
