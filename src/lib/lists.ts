@@ -2,6 +2,7 @@
 // These need a connection; the screens explain when there isn't one.
 import { client } from './account.svelte'
 import { db, LOCAL, type List, type Role } from './db'
+import { api, webLink } from './platform'
 import { saveSettings, settings } from './settings.svelte'
 
 export type Member = { id: string; name: string; role: Role; you: boolean }
@@ -75,7 +76,7 @@ export async function leaveList(listId: string) {
 
 export function inviteLink(token: string) {
   // After the "#", so the token never reaches any server log.
-  return `${location.origin}/#/join/${token}`
+  return webLink(`join/${token}`)
 }
 
 export async function createInvite(listId: string, role: 'editor' | 'viewer'): Promise<{ url: string; expiresAt: string }> {
@@ -90,7 +91,7 @@ export async function revokeInvites(listId: string): Promise<number> {
 }
 
 export async function previewInvite(token: string): Promise<InvitePreview> {
-  const res = await fetch(`/api/wb/invites/${encodeURIComponent(token)}`)
+  const res = await fetch(api(`/api/wb/invites/${encodeURIComponent(token)}`))
   if (!res.ok) throw Object.assign(new Error('invite'), { status: res.status })
   return res.json()
 }

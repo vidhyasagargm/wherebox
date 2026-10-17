@@ -63,7 +63,7 @@ const privacyEn: Section[] = [
   {
     title: 'Speaking',
     paragraphs: [
-      'When you speak to Wherebox, your browser turns speech into text. Depending on the browser this happens on the device, or the audio goes to the browser maker (for example Google for Chrome, Apple for Safari). Wherebox only receives the finished text. Reading answers aloud uses your device’s own voice.',
+      'When you speak to Wherebox, your browser turns speech into text. Depending on the browser this happens on the device, or the audio goes to the browser maker (for example Google for Chrome, Apple for Safari). In the Android and iPhone apps, the phone’s own speech recognition does this instead (Google’s on Android, Apple’s on iPhone), on the phone itself when it has your language. Wherebox only receives the finished text. Reading answers aloud uses your device’s own voice.',
     ],
   },
   {
@@ -146,7 +146,7 @@ const privacyDe: Section[] = [
   {
     title: 'Sprechen',
     paragraphs: [
-      'Wenn du mit Wherebox sprichst, wandelt dein Browser die Sprache in Text um. Je nach Browser passiert das auf dem Gerät, oder die Aufnahme geht an den Browser-Hersteller (zum Beispiel Google bei Chrome, Apple bei Safari). Wherebox erhält nur den fertigen Text. Das Vorlesen nutzt die Stimme deines Geräts.',
+      'Wenn du mit Wherebox sprichst, wandelt dein Browser die Sprache in Text um. Je nach Browser passiert das auf dem Gerät, oder die Aufnahme geht an den Browser-Hersteller (zum Beispiel Google bei Chrome, Apple bei Safari). In den Apps für Android und iPhone übernimmt das die Spracherkennung des Handys (von Google bei Android, von Apple beim iPhone), direkt auf dem Handy, wenn es deine Sprache dort kennt. Wherebox erhält nur den fertigen Text. Das Vorlesen nutzt die Stimme deines Geräts.',
     ],
   },
   {

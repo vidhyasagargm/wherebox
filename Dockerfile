@@ -14,6 +14,10 @@ ARG VITE_COFFEE_URL
 ARG VITE_IMPRINT
 ENV VITE_REPO_URL=${VITE_REPO_URL} VITE_COFFEE_URL=${VITE_COFFEE_URL} VITE_IMPRINT=${VITE_IMPRINT}
 RUN npm run build
+# Lets invite links open the Android app: the SHA-256 fingerprint of its signing key
+# (AB:CD:…, see docs/apps.md). Without it, invite links open in the browser.
+ARG ANDROID_CERT_SHA256
+RUN if [ -n "$ANDROID_CERT_SHA256" ]; then mkdir -p dist/.well-known && printf '[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"fyi.sagar.wherebox","sha256_cert_fingerprints":["%s"]}}]\n' "$ANDROID_CERT_SHA256" > dist/.well-known/assetlinks.json; fi
 
 # --- Serve it: unprivileged nginx, listens on 8080 ---
 FROM nginxinc/nginx-unprivileged:1.29-alpine

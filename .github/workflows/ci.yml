@@ -4,10 +4,17 @@
 #   main         → ghcr.io/<owner>/wherebox:latest and :sha-<short>
 #   tag v1.2.3   → :1.2.3 and :1.2
 #
+# Every run also builds the Android and iOS apps. A version tag signs the Android app
+# and attaches wherebox-<version>.apk to the GitHub release (see docs/apps.md).
+#
 # Optional repository settings:
 #   Variables  VITE_COFFEE_URL   Buy Me a Coffee link shown in Settings
 #              VITE_IMPRINT      Imprint lines separated by | (name | street | city | email); a secret works too
+#              VITE_API_URL      Server the phone apps use (default https://wherebox.sagar.fyi)
+#              ANDROID_CERT_SHA256  Fingerprint of the app signing key, so invite links open the app
 #   Secrets    DEPLOY_WEBHOOK    URL called after a main build (Watchtower, Portainer, Komodo…)
+#              ANDROID_KEYSTORE  The app signing key: base64 of the .jks file
+#              ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
 
 name: CI
 
@@ -126,8 +133,85 @@ jobs:
             VITE_REPO_URL=${{ github.server_url }}/${{ github.repository }}
             VITE_COFFEE_URL=${{ vars.VITE_COFFEE_URL || 'https://buymeacoffee.com/vidhyasagar' }}
             VITE_IMPRINT=${{ vars.VITE_IMPRINT || secrets.VITE_IMPRINT }}
+            ANDROID_CERT_SHA256=${{ vars.ANDROID_CERT_SHA256 }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # The Android app. Signed only when the keystore secrets are set; tags must be signed.
+  android:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+        env:
+          VITE_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          VITE_COFFEE_URL: ${{ vars.VITE_COFFEE_URL || 'https://buymeacoffee.com/vidhyasagar' }}
+          VITE_IMPRINT: ${{ vars.VITE_IMPRINT || secrets.VITE_IMPRINT }}
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+      - run: npx cap sync android
+      - name: Build the APK
+        env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          WHEREBOX_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          WHEREBOX_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          WHEREBOX_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          export JAVA_HOME=$JAVA_HOME_21_X64
+          V=$(node -p "require('./package.json').version")
+          mkdir -p out
+          if [ -n "$ANDROID_KEYSTORE" ]; then
+            echo "$ANDROID_KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
+            export WHEREBOX_KEYSTORE="$RUNNER_TEMP/release.jks"
+            (cd android && ./gradlew assembleRelease --no-daemon)
+            cp android/app/build/outputs/apk/release/app-release.apk "out/wherebox-$V.apk"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "::error::A release needs the ANDROID_KEYSTORE secrets (docs/apps.md)."; exit 1
+          else
+            (cd android && ./gradlew assembleRelease --no-daemon)
+            cp android/app/build/outputs/apk/release/app-release-unsigned.apk "out/wherebox-$V-unsigned.apk"
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android
+          path: out/*.apk
+      - name: Attach to the GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "Wherebox ${TAG#v}" --generate-notes
+          gh release upload "$TAG" out/*.apk --clobber
+
+  # The iOS app, built for the simulator without signing: proves it compiles. Shipping it
+  # needs an Apple Developer account (see docs/apps.md).
+  ios:
+    needs: test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npx cap sync ios
+      - name: Build for the simulator
+        run: |
+          V=$(node -p "require('./package.json').version")
+          CODE=$(node -p "const [a,b,c]=require('./package.json').version.split('.').map(Number); a*10000+b*100+c")
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO MARKETING_VERSION="$V" CURRENT_PROJECT_VERSION="$CODE" build
 
   deploy:
     needs: image

@@ -21,6 +21,7 @@
   import DeleteAccount from './screens/DeleteAccount.svelte'
   import Consent from './screens/Consent.svelte'
   import { account, restoreSession } from './lib/account.svelte'
+  import { handleAppLinks } from './lib/platform'
   import Settings from './screens/Settings.svelte'
   import Voice from './screens/Voice.svelte'
 
@@ -50,6 +51,12 @@
 
     // First launch shows the short introduction, unless opened via the quick-start link.
     if (!settings.onboarded && name !== 'listen') go('welcome', {}, true)
+
+    // Phone apps: invite links and shortcuts open the matching screen.
+    handleAppLinks((r) => {
+      const [path, qs] = r.split('?')
+      go(path, Object.fromEntries(new URLSearchParams(qs ?? '')))
+    })
 
     // In-app links go through the router so Back stays inside the app.
     const onClick = (e: MouseEvent) => {

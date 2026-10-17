@@ -10,4 +10,6 @@ interface ImportMetaEnv {
   readonly VITE_COFFEE_URL?: string
   /** Imprint text (name, address, email); lines separated by "|". Shown only when set. */
   readonly VITE_IMPRINT?: string
+  /** Server the Android/iOS apps use for accounts (the website uses its own address). Default: https://wherebox.sagar.fyi */
+  readonly VITE_API_URL?: string
 }

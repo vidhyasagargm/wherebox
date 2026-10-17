@@ -14,6 +14,7 @@
     setMemberRole,
     type Member,
   } from '../lib/lists'
+  import { isNative } from '../lib/platform'
   import { go, route } from '../lib/router.svelte'
   import { data, showToast } from '../lib/store.svelte'
 
@@ -81,6 +82,13 @@
   async function share() {
     if (!invite || !list) return
     const text = t('lists.shareText', { name: list.name })
+    if (isNative) {
+      const { Share } = await import('@capacitor/share')
+      try {
+        await Share.share({ title: 'Wherebox', text, url: invite.url })
+      } catch {}
+      return
+    }
     if (navigator.share) {
       try {
         await navigator.share({ title: 'Wherebox', text, url: invite.url })

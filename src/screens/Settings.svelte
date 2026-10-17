@@ -10,16 +10,16 @@
   import { applyTheme, DAY, saveSettings, settings, type ReadAloud, type Theme } from '../lib/settings.svelte'
   import { canTalk } from '../lib/talk'
   import { isIOS } from '../lib/speech'
+  import { isNative, quickStartLink } from '../lib/platform'
   import { data, showToast } from '../lib/store.svelte'
 
   let fileInput: HTMLInputElement
   const hasImprint = !!import.meta.env.VITE_IMPRINT
   let persisted = $state(false)
   const days = $derived(settings.lastBackup ? Math.floor((Date.now() - settings.lastBackup) / DAY) : null)
-  const quickLink = `${location.origin}${location.pathname}#/listen`
 
   onMount(async () => {
-    persisted = (await navigator.storage?.persisted?.()) ?? false
+    persisted = isNative || ((await navigator.storage?.persisted?.()) ?? false)
   })
 
   async function doExport() {
@@ -61,7 +61,7 @@
   }
 
   async function copyLink() {
-    await navigator.clipboard?.writeText(quickLink)
+    await navigator.clipboard?.writeText(quickStartLink)
     showToast({ title: t('settings.copied') }, 2500)
   }
 
@@ -113,7 +113,7 @@
         {:else}
           <p class="note"><Icon name="alert" size={22} stroke={2} /><span>{t('settings.warning')}</span></p>
         {/if}
-        {#if persisted}<p class="ok"><Icon name="shield" size={20} stroke={2} />{t('settings.persisted')}</p>{/if}
+        {#if persisted}<p class="ok"><Icon name="shield" size={20} stroke={2} />{t(isNative ? 'settings.persistedApp' : 'settings.persisted')}</p>{/if}
         <button type="button" class="btn btn-primary" onclick={doExport} disabled={!data.items.length}><Icon name="download" />{t('settings.export')}</button>
         <button type="button" class="btn" onclick={() => fileInput.click()}><Icon name="upload" />{t('settings.import')}</button>
         <input bind:this={fileInput} class="sr" type="file" accept="application/json,.json" tabindex="-1" aria-hidden="true" onchange={doImport} />
@@ -152,7 +152,7 @@
       <h2 id="quick">{t('settings.quick')}</h2>
       <div class="card quick">
         <p><Icon name="bolt" size={22} stroke={2} /><span>{t('settings.quickText')}</span></p>
-        <code>{quickLink}</code>
+        <code>{quickStartLink}</code>
         <button type="button" class="btn" onclick={copyLink}><Icon name="copy" />{t('settings.copy')}</button>
         <details>
           <summary>{t('settings.howTo')}</summary>
@@ -163,7 +163,9 @@
                 <li>Füge <strong>URL öffnen</strong> hinzu und füge den Link oben ein.</li>
                 <li>Einstellungen › Bedienungshilfen › Tippen › <strong>Auf Rückseite tippen</strong> › Doppeltippen › deinen Kurzbefehl wählen. Oder: Einstellungen › <strong>Aktionstaste</strong> › Kurzbefehl.</li>
               </ol>
-              <p class="muted small">Hinweis: Auf dem iPhone öffnet der Link Safari. Safari und die Home-Bildschirm-App haben getrennte Daten – nutze also eins von beiden.</p>
+              {#if !isNative}
+                <p class="muted small">Hinweis: Auf dem iPhone öffnet der Link Safari. Safari und die Home-Bildschirm-App haben getrennte Daten – nutze also eins von beiden.</p>
+              {/if}
             {:else}
               <ol>
                 <li>Installiere Wherebox. Halte dann das App-Symbol gedrückt und ziehe <strong>Sprechen</strong> als eigenes Symbol auf den Startbildschirm.</li>
@@ -177,7 +179,9 @@
               <li>Add <strong>Open URLs</strong> and paste the link above.</li>
               <li>Settings › Accessibility › Touch › <strong>Back Tap</strong> › Double Tap › pick your shortcut. Or: Settings › <strong>Action Button</strong> › Shortcut.</li>
             </ol>
-            <p class="muted small">Note: on iPhone the link opens Safari. Safari and the home-screen app keep separate data, so stick to one of them.</p>
+            {#if !isNative}
+              <p class="muted small">Note: on iPhone the link opens Safari. Safari and the home-screen app keep separate data, so stick to one of them.</p>
+            {/if}
           {:else}
             <ol>
               <li>Install Wherebox. Then long-press its icon and drag <strong>Speak</strong> onto your home screen as its own button.</li>

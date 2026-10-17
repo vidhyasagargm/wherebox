@@ -4,7 +4,7 @@ Remember where you put things. Tell it, by typing or speaking, *"I put the passp
 
 - **Local-first.** Everything lives on your device (IndexedDB) and works without an account. No tracking.
 - **Optional accounts.** Sign in with an emailed code to sync between devices and share lists with family, with view-only or edit access.
-- **Works offline.** Installable PWA for Android, iPhone and desktop.
+- **Works offline.** An Android app (download from [Releases](../../releases)), and an installable web app for iPhone, Android and desktop.
 - **English and German.** Understands both, whatever language the app is set to.
 - **Made for everyone.** Large tap targets, high contrast, one-handed use, screen-reader friendly.
 - **Free and open source** (MIT), supported by donations.
@@ -36,7 +36,7 @@ Remember where you put things. Tell it, by typing or speaking, *"I put the passp
 - **Dexie** is a thin, well-maintained IndexedDB wrapper with live queries, so the UI updates itself when data changes.
 - **No AI model or cloud API for understanding sentences.** A rule-based parser (`src/lib/parser.ts`) handles English and German instantly and offline, and is easy to extend. It's covered by tests.
 
-React or Next.js would also work, but they ship more JavaScript for no benefit here. A native app (Flutter, React Native) would have to go through app stores, which goes against "open a link and use it".
+React or Next.js would also work, but they ship more JavaScript for no benefit here. The Android and iOS apps are the same code wrapped with **Capacitor**, plus a small native plugin for speech, so there's one codebase and "open a link and use it" still works too. See [docs/apps.md](docs/apps.md).
 
 ## Voice: what works where
 
@@ -49,8 +49,15 @@ Speech uses the browser's built-in Web Speech API.
 | iPhone – installed to home screen | ⚠️ falls back | Apple's speech API is unreliable in home-screen apps, so **Tap to speak** opens the keyboard and points to its 🎤 dictation key, which works on-device and offline |
 | Desktop Chrome / Edge | ✅ | Edge (and newer Chrome) can recognise speech on-device |
 | Firefox | ❌ → keyboard | No Web Speech recognition |
+| **Android app** | ✅ | The phone's own recognizer, on-device when the language is installed |
+| **iPhone app** | ✅ | Apple's recognizer, on-device when supported (not yet distributed, see [docs/apps.md](docs/apps.md)) |
 
 When there's no internet and the browser needs a server for speech, Wherebox says so and suggests typing or keyboard dictation.
+
+## Get the app
+
+- **Android:** download `wherebox-<version>.apk` from the [latest release](../../releases/latest) on your phone and open it. Android asks once to allow installs from your browser. [Obtainium](https://obtainium.imranr.dev) can keep it updated.
+- **iPhone:** open the website in Safari › Share › **Add to Home Screen**. Apple doesn't allow installing apps from GitHub, so a real iPhone app needs the App Store (see [docs/apps.md](docs/apps.md)).
 
 ## Develop
 
@@ -60,7 +67,8 @@ npm run dev        # http://localhost:5173
 npm test           # parser and search tests
 npm run check      # type check
 npm run build      # → dist/
-npm run icons      # re-render PNG icons from public/icon.svg
+npm run icons      # re-render PNG icons (web, Android, iOS) from public/icon.svg
+npm run app:android  # debug APK; see docs/apps.md for the apps
 ```
 
 The links in Settings › About come from `.env` (`VITE_REPO_URL`, `VITE_COFFEE_URL`).
@@ -77,6 +85,8 @@ src/
   lib/i18n.ts        all English and German strings
   screens/           Home, Voice, Find (answer / matches / not found), Confirm, ItemDetail, Places, Settings, Onboarding
   components/        Nav, Toast, banners, icons
+  lib/platform.ts    website or app; which server to use; app links
+android/, ios/       the Capacitor apps, incl. the native speech plugin (ListenPlugin)
 ```
 
 ## Hosting
@@ -91,6 +101,7 @@ Anyone can host Wherebox (MIT licence). One `docker-compose.yml` and one `.env` 
 
 Images for amd64 and arm64 are published to `ghcr.io/vidhyasagargm/wherebox` and `ghcr.io/vidhyasagargm/wherebox-backend` on every push to `main`.
 
+- **[docs/apps.md](docs/apps.md)**: the Android and iPhone apps, signing and releases
 - **[docs/self-hosting.md](docs/self-hosting.md)**: hosting your own copy
 - **[docs/deploy.md](docs/deploy.md)**: the steps for wherebox.sagar.fyi (Brevo, Cloudflare Tunnel, backups)
 - **[docs/gdpr/](docs/gdpr/)**: what you need as the operator of a public instance in the EU

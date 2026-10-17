@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lists stay off Google's servers: no cloud backup. Moving to a new phone directly
+     (cable or Wi-Fi transfer) still copies them. Otherwise: Settings › Backup, or an account. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+</data-extraction-rules>
