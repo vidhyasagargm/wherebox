@@ -6,6 +6,7 @@
   import { t } from '../lib/i18n'
   import { go } from '../lib/router.svelte'
   import { showToast } from '../lib/store.svelte'
+  import { pendingInvite } from '../lib/lists'
 
   type Step = 'email' | 'code' | 'move'
 
@@ -76,12 +77,19 @@
     const n = await moveDeviceItems(listId)
     waiting = false
     showToast({ title: t('signin.done'), text: t('signin.moved', { n }) }, 4000)
-    go('', {}, true)
+    next()
   }
 
   function finish() {
     showToast({ title: t('signin.done') }, 3000)
-    go('', {}, true)
+    next()
+  }
+
+  // Back to the invite that sent them here, or home.
+  function next() {
+    const invite = pendingInvite()
+    if (invite) go('join/' + invite, {}, true)
+    else go('', {}, true)
   }
 
   // Codes pasted from the email often carry spaces; submit as soon as all six digits are there.

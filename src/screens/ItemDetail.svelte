@@ -5,9 +5,10 @@
   import { compressPhoto, deleteItem, markFound, updateItem } from '../lib/db'
   import { date, monthYear, t } from '../lib/i18n'
   import { go, route } from '../lib/router.svelte'
-  import { data, showToast } from '../lib/store.svelte'
+  import { data, listRole, showToast } from '../lib/store.svelte'
 
   const item = $derived(data.items.find((i) => i.id === route.current.param))
+  const editable = $derived(!!item && listRole(item.listId) !== 'viewer')
   let photoInput = $state<HTMLInputElement>()
   let note = $state<string | null>(null)
 
@@ -49,7 +50,7 @@
 <div class="screen">
   <TopBar>
     {#snippet end()}
-      {#if item}
+      {#if item && editable}
         <a class="chip" href={`#/confirm?id=${item.id}&what=${encodeURIComponent(item.name)}&where=${encodeURIComponent(item.where)}`}>
           <Icon name="edit" size={20} />{t('edit')}
         </a>
@@ -69,33 +70,41 @@
 
         {#if item.photo}
           <Photo blob={item.photo} alt={t('item.photoAlt', { name: item.name })} />
+        {/if}
+        {#if editable && item.photo}
           <div class="photo-actions">
             <button type="button" class="chip" onclick={() => photoInput?.click()}><Icon name="camera" size={20} />{t('item.changePhoto')}</button>
             <button type="button" class="chip" onclick={() => updateItem(item.id, { photo: undefined })}><Icon name="trash" size={20} />{t('item.removePhoto')}</button>
           </div>
-        {:else}
+        {:else if editable}
           <button type="button" class="add-photo photo-placeholder" onclick={() => photoInput?.click()}>
             <span><Icon name="camera" size={22} />{t('item.addPhoto')}</span>
           </button>
         {/if}
         <input bind:this={photoInput} class="sr" type="file" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true" onchange={pickPhoto} />
 
-        <div class="field">
-          <label for="note">{t('item.note')}</label>
-          <textarea
-            id="note"
-            class="input"
-            placeholder={t('item.notePh')}
-            value={note ?? item.note ?? ''}
-            oninput={(e) => (note = e.currentTarget.value)}
-            onblur={saveNote}></textarea>
-        </div>
+        {#if !editable}
+          {#if item.note}<p class="note"><strong>{t('item.note')}:</strong> {item.note}</p>{/if}
+        {:else}
+          <div class="field">
+            <label for="note">{t('item.note')}</label>
+            <textarea
+              id="note"
+              class="input"
+              placeholder={t('item.notePh')}
+              value={note ?? item.note ?? ''}
+              oninput={(e) => (note = e.currentTarget.value)}
+              onblur={saveNote}></textarea>
+          </div>
+        {/if}
       </section>
 
-      <div class="buttons">
-        <a class="btn btn-primary" href={`#/confirm?id=${item.id}&what=${encodeURIComponent(item.name)}&moved=1`}>{t('answer.moved')}</a>
-        <button type="button" class="btn" onclick={found}><Icon name="check" />{t('answer.found')}</button>
-      </div>
+      {#if editable}
+        <div class="buttons">
+          <a class="btn btn-primary" href={`#/confirm?id=${item.id}&what=${encodeURIComponent(item.name)}&moved=1`}>{t('answer.moved')}</a>
+          <button type="button" class="btn" onclick={found}><Icon name="check" />{t('answer.found')}</button>
+        </div>
+      {/if}
 
       <section class="history" aria-labelledby="hist">
         <h2 id="hist">{t('item.history')}</h2>
@@ -111,7 +120,9 @@
         <p class="muted first">{t('item.firstSaved', { date: date(item.createdAt, true) })}</p>
       </section>
 
-      <button type="button" class="btn btn-danger" onclick={remove}><Icon name="trash" />{t('item.delete')}</button>
+      {#if editable}
+        <button type="button" class="btn btn-danger" onclick={remove}><Icon name="trash" />{t('item.delete')}</button>
+      {/if}
     {/if}
   </main>
 </div>
@@ -154,6 +165,10 @@
     background: var(--surface);
     font-weight: 700;
     font-size: 16px;
+  }
+  .note {
+    font-size: 17px;
+    line-height: 1.45;
   }
   .photo-actions {
     display: flex;

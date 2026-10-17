@@ -217,7 +217,18 @@ async function pull() {
 
   const remoteLists = (await c.collection('lists').getFullList()).map((r) => toList(r, userId)).filter((l): l is List => !!l)
   const listIds = new Set(remoteLists.map((l) => l.id))
-  const goneLists = (await db.lists.toArray()).filter((l) => !listIds.has(l.id)).map((l) => l.id)
+  const known = await db.lists.toArray()
+  const goneLists = known.filter((l) => !listIds.has(l.id)).map((l) => l.id)
+  // Shared lists show whose they are ("From Sagar"), so two lists called "Home" can be told apart.
+  for (const l of remoteLists) {
+    if (l.role === 'owner') continue
+    l.ownerName = known.find((k) => k.id === l.id)?.ownerName
+    if (l.ownerName) continue
+    try {
+      const people: { name: string; role: Role }[] = await c.send(`/api/wb/lists/${l.id}/members`, { method: 'GET' })
+      l.ownerName = people.find((p) => p.role === 'owner')?.name
+    } catch {}
+  }
   await db.transaction('rw', db.items, db.lists, async () => {
     await db.lists.bulkPut(remoteLists)
     for (const id of goneLists) {

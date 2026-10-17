@@ -15,11 +15,14 @@
   import Places from './screens/Places.svelte'
   import Privacy from './screens/Privacy.svelte'
   import SignIn from './screens/SignIn.svelte'
+  import Lists from './screens/Lists.svelte'
+  import ListDetail from './screens/ListDetail.svelte'
+  import Join from './screens/Join.svelte'
   import { restoreSession } from './lib/account.svelte'
   import Settings from './screens/Settings.svelte'
   import Voice from './screens/Voice.svelte'
 
-  const screens = { find: Find, item: ItemDetail, confirm: Confirm, places: Places, settings: Settings, listen: Voice, welcome: Onboarding, privacy: Privacy, signin: SignIn }
+  const screens = { find: Find, item: ItemDetail, confirm: Confirm, places: Places, settings: Settings, listen: Voice, welcome: Onboarding, privacy: Privacy, signin: SignIn, lists: Lists, list: ListDetail, join: Join }
   // On wide screens these open beside Home instead of replacing it.
   const sideBySide = new Set(['home', 'find', 'item', 'confirm'])
 

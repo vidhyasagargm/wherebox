@@ -4,7 +4,7 @@
   import { t } from '../lib/i18n'
   import { escapeRe, ROOMS, splitPlace } from '../lib/parser'
   import { settings } from '../lib/settings.svelte'
-  import { data, places, showToast } from '../lib/store.svelte'
+  import { canEdit, data, places, showToast } from '../lib/store.svelte'
 
   const groups = $derived(places(data.items, data.rooms))
   let open = $state<string | null>(null)
@@ -72,7 +72,7 @@
   <main>
     <div class="head">
       <h1 tabindex="-1">{t('places.title')}</h1>
-      {#if groups.length}
+      {#if groups.length && canEdit()}
         <button type="button" class="chip" aria-pressed={editing} onclick={() => (editing = !editing)}>
           {editing ? t('done') : t('edit')}
         </button>

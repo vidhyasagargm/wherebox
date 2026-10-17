@@ -4,7 +4,7 @@
   import { date, t } from '../lib/i18n'
   import { go } from '../lib/router.svelte'
   import { canTalk } from '../lib/talk'
-  import { showToast } from '../lib/store.svelte'
+  import { canEdit, showToast } from '../lib/store.svelte'
   import Icon from './Icon.svelte'
   import Photo from './Photo.svelte'
 
@@ -33,8 +33,10 @@
 </article>
 
 <div class="actions">
-  <button type="button" class="btn btn-primary" onclick={found}><Icon name="check" stroke={2.6} />{t('answer.found')}</button>
-  <a class="btn" href={`#/confirm?id=${item.id}&what=${encodeURIComponent(item.name)}&moved=1`}>{t('answer.moved')}</a>
+  {#if canEdit()}
+    <button type="button" class="btn btn-primary" onclick={found}><Icon name="check" stroke={2.6} />{t('answer.found')}</button>
+    <a class="btn" href={`#/confirm?id=${item.id}&what=${encodeURIComponent(item.name)}&moved=1`}>{t('answer.moved')}</a>
+  {/if}
   <a class="btn-link" href={'#/item/' + item.id}>{t('answer.before')}</a>
 </div>
 

@@ -28,7 +28,7 @@ export type Item = {
 export type Role = 'owner' | 'editor' | 'viewer'
 
 // An account list, as last seen from the server.
-export type List = { id: string; name: string; role: Role }
+export type List = { id: string; name: string; role: Role; ownerName?: string }
 
 // Rooms the user named themselves (by renaming a place), so they group like built-in rooms.
 export type Room = { name: string }

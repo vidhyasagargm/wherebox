@@ -8,7 +8,7 @@
   import { go, route } from '../lib/router.svelte'
   import { saveSettings, settings } from '../lib/settings.svelte'
   import { canListen } from '../lib/speech'
-  import { data, handle } from '../lib/store.svelte'
+  import { activeListName, canEdit, data, handle } from '../lib/store.svelte'
   import { unlockTalk } from '../lib/talk'
   import { account } from '../lib/account.svelte'
 
@@ -83,7 +83,17 @@
   {/if}
 
   <section class="ask">
+    {#if account.user || data.lists.length}
+      <a class="list-switch" href="#/lists" aria-label={`${t('lists.current', { name: activeListName() })}. ${t('lists.switch')}`}>
+        <Icon name="list" size={20} stroke={2} />
+        <span>{activeListName()}</span>
+        <Icon name="down" size={18} stroke={2.4} />
+      </a>
+    {/if}
     <h1 tabindex="-1">{t('home.title')}</h1>
+    {#if !canEdit()}
+      <p class="view-only" role="status"><Icon name="eye" size={20} stroke={2} />{t('lists.viewOnlyBanner')}</p>
+    {/if}
     <form onsubmit={submit}>
       <label for="q" class="sr">{t('home.inputLabel')}</label>
       <div class="bar">
@@ -169,6 +179,36 @@
   }
   .sync.warn {
     color: var(--danger);
+  }
+  .list-switch {
+    align-self: flex-start;
+    max-width: 100%;
+    min-height: 44px;
+    margin-bottom: -4px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .list-switch span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .view-only {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent-text);
   }
   .ask {
     display: flex;
