@@ -25,3 +25,10 @@ dist-ssr
 
 # npm cache used by CI
 .npm
+
+# PocketBase binary and local data
+backend/.bin
+backend/pb_data
+
+# Server secrets
+backend.env

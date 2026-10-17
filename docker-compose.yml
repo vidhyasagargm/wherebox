@@ -28,6 +28,33 @@ services:
         max-file: "2"
     networks: [tunnel]
 
+  pocketbase:
+    image: ghcr.io/vidhyasagargm/wherebox-backend:latest
+    container_name: wherebox-backend
+    restart: unless-stopped
+    # Settings for sending sign-in emails (Brevo) and the public address. See backend.env.example.
+    env_file: backend.env
+    volumes:
+      - pb_data:/pb_data
+    # The admin dashboard is only reachable from this machine:
+    #   ssh -L 8090:127.0.0.1:8090 you@server  →  http://localhost:8090/_/
+    ports:
+      - "127.0.0.1:8090:8090"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "2"
+    networks: [tunnel]
+
+volumes:
+  pb_data:
+
 networks:
   # Use the same network your cloudflared container is on, or remove this.
   tunnel:

@@ -35,6 +35,13 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - name: Backend tests (real PocketBase)
+        run: |
+          V=$(cat backend/PB_VERSION)
+          mkdir -p backend/.bin
+          curl -fsSL -o /tmp/pb.zip "https://github.com/pocketbase/pocketbase/releases/download/v$V/pocketbase_${V}_linux_amd64.zip"
+          unzip -q /tmp/pb.zip pocketbase -d backend/.bin
+          npm run test:backend
 
   image:
     needs: test
@@ -61,6 +68,24 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha
+      - id: meta-backend
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}-backend
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+      - uses: docker/build-push-action@v7
+        with:
+          context: backend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
       - uses: docker/build-push-action@v7
         with:
           context: .

@@ -124,6 +124,20 @@ Wherebox is free, with no ads and no tracking. If it helps you, you can [buy me 
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=000)](https://buymeacoffee.com/vidhyasagar)
 
+## Accounts and sharing (in development)
+
+Optional accounts add sync across devices and shared lists. The backend in `backend/` is [PocketBase](https://pocketbase.io) with:
+
+- `pb_migrations/`: the schema and access rules (lists are visible only to their members; only editors can write)
+- `pb_hooks/`: sign-up with recorded consent, invite links (only a hash of each link is stored), member management, data export, account deletion, and a daily clean-up (unconfirmed sign-ups after a day, inactive accounts after 24 months with a warning first)
+- sign-in by emailed code only, no passwords; request logs without IP addresses; rate limits on sign-in
+
+nginx forwards only the API paths the app uses. The PocketBase dashboard and admin API are not reachable from the internet.
+
+```bash
+npm run test:backend   # needs the PocketBase binary in backend/.bin (see backend/PB_VERSION)
+```
+
 ## Contributing
 
 Issues and pull requests are welcome. Adding phrasings or a language mostly means editing `src/lib/parser.ts` (with a test in `parser.test.ts`) and `src/lib/i18n.ts`.
