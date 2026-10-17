@@ -8,7 +8,8 @@ import assert from 'node:assert/strict'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const BIN = process.env.PB_BIN ?? join(ROOT, '.bin', 'pocketbase')
-const PORT = 9000 + Math.floor(Math.random() * 900)
+// 7000–7899: away from api.test.mjs, which uses 8000–8899 for PocketBase and +1000 for its mail server.
+const PORT = 7000 + Math.floor(Math.random() * 900)
 const API = `http://127.0.0.1:${PORT}`
 let pb, dir, log = ''
 
@@ -38,7 +39,7 @@ it('signs in with a code from the server log, no email server needed', async () 
   const req = await (await fetch(API + '/api/collections/users/request-otp', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'home@lan.local', consent: true, consentVersion: '2026-10-17' }),
+    body: JSON.stringify({ email: 'home@lan.local', consent: true }),
   })).json()
   let code
   for (let i = 0; i < 50 && !code; i++) {
@@ -49,7 +50,15 @@ it('signs in with a code from the server log, no email server needed', async () 
   const auth = await fetch(API + '/api/collections/users/auth-with-otp', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ otpId: req.otpId, password: code }),
+    body: JSON.stringify({ otpId: req.otpId, password: code, consent: true }),
   })
   assert.equal(auth.status, 200)
+})
+
+// Runs after the sign-in test: together they stay within the per-IP limit (3 code requests a minute).
+it('limits code requests per address (1 a minute)', async () => {
+  const send = () => fetch(API + '/api/collections/users/request-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'flood@lan.local', consent: true }) })
+  const statuses = []
+  for (let i = 0; i < 2; i++) statuses.push((await send()).status)
+  assert.deepEqual(statuses, [200, 429])
 })

@@ -80,10 +80,10 @@ async function call(method, path, { token, body, raw } = {}) {
 // Signs a user in through the real email-code flow and returns their token and id.
 async function signIn(email, { consent = true, name = '' } = {}) {
   mail.delete(email)
-  const req = await call('POST', '/api/collections/users/request-otp', { body: { email, consent, consentVersion: '2026-10-17', name } })
+  const req = await call('POST', '/api/collections/users/request-otp', { body: { email, consent } })
   assert.equal(req.status, 200)
   const text = await waitFor(() => mail.get(email)?.match(/\b(\d{6})\b/))
-  const auth = await call('POST', '/api/collections/users/auth-with-otp', { body: { otpId: req.json.otpId, password: text[1] } })
+  const auth = await call('POST', '/api/collections/users/auth-with-otp', { body: { otpId: req.json.otpId, password: text[1], consent, name } })
   assert.equal(auth.status, 200, JSON.stringify(auth.json))
   return { token: auth.json.token, id: auth.json.record.id, record: auth.json.record }
 }
@@ -95,7 +95,7 @@ before(async () => {
   execFileSync(BIN, ['migrate', 'up', ...args], { stdio: 'pipe' })
   execFileSync(BIN, ['superuser', 'upsert', ADMIN.email, ADMIN.password, ...args], { stdio: 'pipe' })
   pb = spawn(BIN, ['serve', '--http', `127.0.0.1:${PORT}`, ...args], {
-    env: { ...process.env, SMTP_HOST: '127.0.0.1', SMTP_PORT: String(SMTP_PORT), SMTP_FROM: 'noreply@test.local', WB_APP_URL: 'http://localhost:5173' },
+    env: { ...process.env, SMTP_HOST: '127.0.0.1', SMTP_PORT: String(SMTP_PORT), SMTP_FROM: 'noreply@test.local', WB_APP_URL: 'http://localhost:5173', WB_TEST_NO_ADDRESS_LIMIT: 'true' },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let log = ''
@@ -138,6 +138,35 @@ describe('sign-up and sign-in', () => {
     assert.ok(a.record.consentAt)
     assert.ok(a.record.lastActiveAt)
     assert.equal(a.record.avatar, undefined)
+  })
+
+  it("doesn't let someone else's code request set the name or consent", async () => {
+    // An attacker asks for a code for the victim's address, trying to plant a name.
+    await call('POST', '/api/collections/users/request-otp', { body: { email: 'victim@test.local', consent: true, consentVersion: 'fake', name: 'ATTACKER' } })
+    await new Promise((r) => setTimeout(r, 300))
+    const v = await signIn('victim@test.local', { name: 'Vera' })
+    assert.equal(v.record.name, 'Vera')
+    assert.equal(v.record.consentVersion, (await call('GET', '/api/wb/consent')).json.version)
+  })
+
+  it("keeps nothing from a sign-in with a wrong code", async () => {
+    mail.delete('wrong@test.local')
+    await call('POST', '/api/collections/users/request-otp', { body: { email: 'wrong@test.local', consent: true } })
+    const req = await call('POST', '/api/collections/users/request-otp', { body: { email: 'wrong@test.local', consent: true } })
+    await call('POST', '/api/collections/users/auth-with-otp', { body: { otpId: req.json.otpId, password: '000000', consent: true, name: 'Mallory' } })
+    const admin = await adminToken()
+    const u = (await call('GET', '/api/collections/users/records?filter=' + encodeURIComponent('email="wrong@test.local"'), { token: admin })).json.items[0]
+    assert.equal(u.verified, false)
+    assert.equal(u.name, '')
+    assert.equal(u.consentVersion, '')
+  })
+
+  it('requires consent when the account is first completed', async () => {
+    mail.delete('nocheck@test.local')
+    const req = await call('POST', '/api/collections/users/request-otp', { body: { email: 'nocheck@test.local', consent: true } })
+    const code = (await waitFor(() => mail.get('nocheck@test.local')?.match(/\b(\d{6})\b/)))[1]
+    const auth = await call('POST', '/api/collections/users/auth-with-otp', { body: { otpId: req.json.otpId, password: code } })
+    assert.equal(auth.status, 400)
   })
 
   it('tells the app which consent version to ask for', async () => {
