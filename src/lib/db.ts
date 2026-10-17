@@ -5,6 +5,10 @@ export type Move = { where: string; from: number; to: number }
 // The list that only lives on this device (no account needed).
 export const LOCAL = 'local'
 
+// Photos are kept as raw bytes: Safari can't reliably store Blob objects in IndexedDB
+// ("Error preparing Blob/File data to be stored in object store").
+export type StoredPhoto = { data: ArrayBuffer; type: string }
+
 export type Item = {
   id: string
   listId: string
@@ -12,7 +16,8 @@ export type Item = {
   where: string
   since: number
   note?: string
-  photo?: Blob
+  // A Blob only in data saved before version 1.1.2.
+  photo?: StoredPhoto | Blob
   history: Move[]
   createdAt: number
   updatedAt: number
@@ -194,13 +199,43 @@ export async function persistStorage(): Promise<boolean> {
   return navigator.storage.persist()
 }
 
-export async function compressPhoto(file: File, max = 1280): Promise<Blob> {
-  const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bitmap.width * scale)
-  canvas.height = Math.round(bitmap.height * scale)
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  bitmap.close()
-  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('photo'))), 'image/jpeg', 0.8))
+export async function storePhoto(blob: Blob): Promise<StoredPhoto> {
+  return { data: await blob.arrayBuffer(), type: blob.type || 'image/jpeg' }
+}
+
+export function photoBlob(photo: StoredPhoto | Blob | undefined): Blob | undefined {
+  if (!photo) return undefined
+  if (photo instanceof Blob) return photo
+  return new Blob([photo.data], { type: photo.type })
+}
+
+// Shrinks a picked photo to at most 1280 px and re-encodes it as JPEG.
+// Throws if the browser can't read the image (e.g. HEIC outside Safari).
+export async function compressPhoto(file: Blob, max = 1280): Promise<StoredPhoto> {
+  const url = URL.createObjectURL(file)
+  try {
+    let source: ImageBitmap | HTMLImageElement
+    try {
+      source = await createImageBitmap(file)
+    } catch {
+      // Some formats only decode through an <img>, e.g. iPhone HEIC photos in Safari.
+      const img = new Image()
+      img.src = url
+      await img.decode()
+      source = img
+    }
+    const w = 'naturalWidth' in source ? source.naturalWidth : source.width
+    const h = 'naturalHeight' in source ? source.naturalHeight : source.height
+    if (!w || !h) throw new Error('empty image')
+    const scale = Math.min(1, max / Math.max(w, h))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(w * scale)
+    canvas.height = Math.round(h * scale)
+    canvas.getContext('2d')!.drawImage(source, 0, 0, canvas.width, canvas.height)
+    if ('close' in source) source.close()
+    const jpeg = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('photo'))), 'image/jpeg', 0.8))
+    return storePhoto(jpeg)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
 }

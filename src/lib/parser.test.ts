@@ -8,6 +8,8 @@ describe('parse (English)', () => {
     ['I put the spare keys in the hallway key bowl', 'save', 'Spare keys', 'Hallway key bowl'],
     ['The winter jackets are in the bedroom wardrobe', 'save', 'Winter jackets', 'Bedroom wardrobe'],
     ['christmas lights in the attic red box', 'save', 'Christmas lights', 'Attic red box'],
+    ['drill on the garage top shelf', 'save', 'Drill', 'Garage top shelf'],
+    ['keys on the kitchen table', 'save', 'Keys', 'Kitchen table'],
     ['I left my laptop charger on the sofa table', 'save', 'Laptop charger', 'Sofa table'],
     ['I hid the birth certificate under the mattress', 'save', 'Birth certificate', 'Under the mattress'],
     ['Passport -> study desk', 'save', 'Passport', 'Study desk'],

@@ -1,21 +1,24 @@
-// Shared setup for the end-to-end tests: a real PocketBase with a throwaway
-// database, a tiny SMTP server that catches sign-in codes, the Vite dev server,
-// and simulated phones (browser contexts) that talk to them.
+// Shared setup for the end-to-end tests. Everything runs like production:
+// the built app served by nginx with the real nginx.conf (so the API allowlist,
+// security headers and service worker are part of every test), a real PocketBase
+// with a throwaway database, and a tiny SMTP server that catches sign-in codes.
 //
-//   npm run test:e2e
+//   npm run test:e2e                     Chromium
+//   E2E_BROWSER=webkit npm run test:e2e  Safari's engine, as an iPhone
 //
-// Needs the PocketBase binary in backend/.bin and a Chromium: either
-// `npx playwright install chromium`, or CHROME_PATH pointing at an installed one.
+// Needs: the PocketBase binary in backend/.bin, nginx on the PATH, and the browsers
+// (`npx playwright install chromium webkit`; CHROME_PATH may point at an installed Chrome).
 import { execFileSync, spawn } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { chromium } from 'playwright'
+import { chromium, devices, webkit } from 'playwright'
 
 const REPO = resolve(import.meta.dirname, '..')
 const PB = process.env.PB_BIN ?? join(REPO, 'backend/.bin/pocketbase')
 export const ADMIN = { email: 'admin@test.local', password: 'test-only-password-123' }
+export const BROWSER = process.env.E2E_BROWSER === 'webkit' ? 'webkit' : 'chromium'
 
 const wait = async (fn, ms = 10000) => {
   const end = Date.now() + ms
@@ -29,6 +32,45 @@ const wait = async (fn, ms = 10000) => {
   }
 }
 export const eventually = (fn, ms = 8000) => wait(fn, ms).catch(() => false)
+
+// The production build, made once per test file.
+let built = false
+function buildApp() {
+  if (built || process.env.E2E_SKIP_BUILD) return
+  execFileSync('npx', ['vite', 'build', '--logLevel', 'error'], { cwd: REPO, stdio: 'inherit' })
+  built = true
+}
+
+// The real nginx.conf, adjusted only for paths, ports and the backend address.
+function startNginx(dir, port, pbPort) {
+  const site = readFileSync(join(REPO, 'nginx.conf'), 'utf8')
+    .replace('listen 8080;', `listen 127.0.0.1:${port};`)
+    .replace('root /usr/share/nginx/html;', `root ${join(REPO, 'dist')};`)
+    .replace(/resolver [^;]+;/, '')
+    .replace('http://pocketbase:8090', `http://127.0.0.1:${pbPort}`)
+    .replace('/dev/stdout', join(dir, 'access.log'))
+    .replace('/dev/stderr', join(dir, 'error.log'))
+  mkdirSync(join(dir, 'tmp'), { recursive: true })
+  const conf = join(dir, 'nginx.conf')
+  writeFileSync(
+    conf,
+    `pid ${join(dir, 'nginx.pid')};
+error_log ${join(dir, 'nginx-error.log')};
+daemon off;
+events {}
+http {
+  types { text/html html; text/css css; application/javascript js mjs; application/json json; application/manifest+json webmanifest; image/svg+xml svg; image/png png; image/x-icon ico; font/woff2 woff2; }
+  default_type application/octet-stream;
+  client_body_temp_path ${dir}/tmp; proxy_temp_path ${dir}/tmp; fastcgi_temp_path ${dir}/tmp; uwsgi_temp_path ${dir}/tmp; scgi_temp_path ${dir}/tmp;
+${site}
+}
+`,
+  )
+  // -e: don't touch the system's default error log (not writable without root on Linux).
+  const flags = ['-e', join(dir, 'nginx-error.log'), '-c', conf, '-p', dir]
+  execFileSync('nginx', ['-t', '-q', ...flags], { stdio: 'inherit' })
+  return spawn('nginx', flags, { stdio: 'ignore' })
+}
 
 function smtpSink(port) {
   const mail = new Map()
@@ -66,46 +108,54 @@ function smtpSink(port) {
   return new Promise((r) => server.listen(port, '127.0.0.1', () => r({ mail, close: () => server.close() })))
 }
 
-export async function startStack({ pbPort = 8090, vitePort = 5180, smtpPort = 2526 } = {}) {
+export async function startStack({ pbPort = 8090, webPort = 5180, smtpPort = 2526 } = {}) {
+  buildApp()
   const smtp = await smtpSink(smtpPort)
   const dir = mkdtempSync(join(tmpdir(), 'wb-e2e-'))
   const args = ['--dir', join(dir, 'pb_data'), '--migrationsDir', join(REPO, 'backend/pb_migrations'), '--hooksDir', join(REPO, 'backend/pb_hooks')]
   execFileSync(PB, ['migrate', 'up', ...args], { stdio: 'pipe' })
   execFileSync(PB, ['superuser', 'upsert', ADMIN.email, ADMIN.password, ...args], { stdio: 'pipe' })
   const pb = spawn(PB, ['serve', '--http', `127.0.0.1:${pbPort}`, ...args], {
+    // The suite signs the same people in many times; the per-address limit has its own test.
     env: { ...process.env, SMTP_HOST: '127.0.0.1', SMTP_PORT: String(smtpPort), SMTP_FROM: 'noreply@test.local', WB_TEST_NO_ADDRESS_LIMIT: 'true' },
     stdio: 'ignore',
   })
-  const vite = spawn('npx', ['vite', '--port', String(vitePort), '--strictPort'], {
-    cwd: REPO,
-    env: { ...process.env, WB_API_TARGET: `http://127.0.0.1:${pbPort}` },
-    stdio: 'ignore',
-    detached: true,
-  })
   const API = `http://127.0.0.1:${pbPort}`
-  const BASE = `http://localhost:${vitePort}`
+  const BASE = `http://localhost:${webPort}`
   await wait(async () => (await fetch(API + '/api/health')).ok)
-  await wait(async () => (await fetch(BASE + '/')).ok, 30000)
+  const nginx = startNginx(dir, webPort, pbPort)
+  await wait(async () => (await fetch(BASE + '/')).ok)
 
-  const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {})
-  const devices = []
+  const browser =
+    BROWSER === 'webkit' ? await webkit.launch() : await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {})
+  const phone = BROWSER === 'webkit' ? devices['iPhone 15'] : { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 }
+  const all = []
 
   // A simulated phone. Errors are collected, except ones a test causes on purpose.
-  async function device({ ignore = [] } = {}) {
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, acceptDownloads: true })
-    await ctx.addInitScript(() => {
-      if (!localStorage.getItem('wherebox.settings'))
-        localStorage.setItem('wherebox.settings', JSON.stringify({ onboarded: true, lang: 'en', installDismissedUntil: 9e15 }))
-    })
+  // `settings: null` starts like a first visit; `init` runs in the page before the app (e.g. to mock APIs).
+  async function device({ ignore = [], settings = { onboarded: true, lang: 'en', installDismissedUntil: 9e15 }, init, initArg, context = {}, ready = '#q' } = {}) {
+    const ctx = await browser.newContext({ ...phone, acceptDownloads: true, ...context })
+    await ctx.addInitScript((s) => {
+      if (s && !localStorage.getItem('wherebox.settings')) localStorage.setItem('wherebox.settings', JSON.stringify(s))
+    }, settings)
+    if (init) await ctx.addInitScript(init, initArg)
+    // Report uncaught promise errors with their stack, so a failure says where it came from.
+    await ctx.addInitScript(() =>
+      addEventListener('unhandledrejection', (e) => console.error('UNHANDLED ' + (e.reason?.stack || e.reason?.message || e.reason))),
+    )
     const p = await ctx.newPage()
     const errors = []
-    const expected = (text) => [/ERR_INTERNET_DISCONNECTED/, ...ignore].some((re) => re.test(text))
-    p.on('pageerror', (e) => errors.push(e.message))
+    // Requests failing while a test is deliberately offline are expected (Chromium and WebKit word it differently).
+    const offline = [/ERR_INTERNET_DISCONNECTED/, /network connection was lost/i, /Could not connect/i, /due to access control checks/, /WebKit encountered an internal error/]
+    const expected = (text) => [...offline, ...ignore].some((re) => re.test(text))
+    // WebKit reports a request failing while offline as a page error; real exceptions still count.
+    p.on('pageerror', (e) => !expected(e.message) && errors.push(e.message))
+    p.on('console', (m) => m.text().startsWith('UNHANDLED ') && errors.push(m.text().slice(0, 600)))
     p.on('console', (m) => m.type() === 'error' && !expected(m.text()) && errors.push(m.text()))
     await p.goto(BASE + '/')
-    await p.waitForSelector('#q')
+    if (settings?.onboarded && ready) await p.waitForSelector(ready)
     const d = { ctx, p, errors }
-    devices.push(d)
+    all.push(d)
     return d
   }
 
@@ -144,23 +194,40 @@ export async function startStack({ pbPort = 8090, vitePort = 5180, smtpPort = 25
   }
   const adminToken = async () => (await api('POST', '/api/collections/_superusers/auth-with-password', null, { identity: ADMIN.email, password: ADMIN.password })).json.token
 
-  const pngFile = () => {
-    const f = join(dir, 'spot.png')
-    writeFileSync(f, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'))
+  // A realistic phone photo (4032×3024 JPEG).
+  const jpegFile = async () => {
+    const f = join(dir, 'photo.jpg')
+    const { default: sharp } = await import('sharp')
+    await sharp({ create: { width: 4032, height: 3024, channels: 3, background: '#a86' } }).jpeg({ quality: 90 }).toFile(f)
     return f
+  }
+
+  // Saves a file the app hands to the user: a download on desktop, the share sheet on phones.
+  async function savedFile(p, click, target) {
+    await p.evaluate(() => {
+      window.__shared = null
+      navigator.canShare = () => true
+      navigator.share = async (data) => {
+        window.__shared = await data.files[0].text()
+      }
+    })
+    const download = p.waitForEvent('download', { timeout: 15000 }).catch(() => null)
+    await click()
+    const shared = await wait(() => p.evaluate(() => window.__shared), 15000).catch(() => null)
+    if (shared) writeFileSync(target, shared)
+    else await (await download).saveAs(target)
+    return target
   }
 
   async function close() {
     await browser.close()
     pb.kill()
-    try {
-      process.kill(-vite.pid)
-    } catch {}
+    nginx.kill()
     smtp.close()
     rmSync(dir, { recursive: true, force: true })
   }
 
-  return { BASE, mail: smtp.mail, device, devices, say, titles, signIn, api, adminToken, pngFile, dir, close }
+  return { BASE, mail: smtp.mail, device, devices: all, say, titles, signIn, api, adminToken, jpegFile, savedFile, dir, close }
 }
 
 // Collects named checks so one run reports everything that failed, not just the first.

@@ -32,7 +32,7 @@ const EN: Rules = {
     /^(?<what>.+?)\s+(?:is|are|'s|is now|are now|now)\s+(?<where>(?:in|inside|on|on top of|under|underneath|behind|next to|beside|by|at|near|between|in front of|above|below)\s+.+)$/i,
     /^(?<what>.+?)\s+(?:goes|go|belongs|belong|lives|live)\s+(?<where>(?:in|inside|on|under|behind|next to|at)\s+.+)$/i,
     /^(?<what>.+?)\s*(?:->|→|=>|:)\s*(?<where>.+)$/,
-    /^(?<what>.+?)\s+(?<where>(?:in|inside|on top of|under|underneath|behind|next to)\s+.+)$/i,
+    /^(?<what>.+?)\s+(?<where>(?:in|inside|on|on top of|under|underneath|behind|next to)\s+.+)$/i,
   ],
   fillers: ['i', 'the', 'my', 'our', 'a', 'an', 'some', 'his', 'her', 'their', 'your', 'in', 'into', 'inside', 'on', 'onto', 'to', 'at', 'of', 'away', 'there', 'now', 'just', 'please', 'again'],
   keepPreps: ['under', 'underneath', 'beneath', 'behind', 'next to', 'beside', 'by', 'near', 'between', 'in front of', 'above', 'below', 'on top of'],

@@ -7,7 +7,7 @@
 import type PocketBase from 'pocketbase'
 import type { RecordModel } from 'pocketbase'
 import { account, checkConsent } from './account.svelte'
-import { changes, db, isAccountList, type Item, type List, type Role } from './db'
+import { changes, db, isAccountList, photoBlob, storePhoto, type Item, type List, type Role } from './db'
 import { t } from './i18n'
 import { saveSettings, settings } from './settings.svelte'
 
@@ -49,8 +49,17 @@ export async function ensureList(c: PocketBase): Promise<List> {
 export function startSync(c: PocketBase) {
   pb = c
   const onChange = () => schedule(800)
-  const onOnline = () => schedule(0)
-  const onVisible = () => document.visibilityState === 'visible' && schedule(0)
+  // Back online or back in front: catch up, and restart live updates if they aren't running
+  // (e.g. the app was opened without a connection).
+  const wake = () => {
+    schedule(0)
+    if (!c.realtime.isConnected) subscribe()
+  }
+  const onOnline = wake
+  const onVisible = () => document.visibilityState === 'visible' && wake()
+  // A safety net in case the live connection dies without anyone noticing.
+  const every = setInterval(() => document.visibilityState === 'visible' && schedule(0), 5 * 60_000)
+  cleanups.push(() => clearInterval(every))
   changes.addEventListener('change', onChange)
   addEventListener('online', onOnline)
   document.addEventListener('visibilitychange', onVisible)
@@ -124,11 +133,22 @@ function expired() {
   account.status = 'idle'
 }
 
+let subscribing = false
 async function subscribe() {
-  if (!pb) return
+  if (!pb || subscribing) return
   const userId = pb.authStore.record?.id
   if (!userId) return
+  subscribing = true
   try {
+    // Start clean, so a failed earlier attempt doesn't leave duplicate listeners.
+    await pb.realtime.unsubscribe().catch(() => {})
+    // The live connection reconnects by itself after a lost signal, but changes made in the
+    // meantime are not replayed: catch up with a full sync on every reconnect.
+    let connected = false
+    await pb.realtime.subscribe('PB_CONNECT', () => {
+      if (connected) schedule(0)
+      connected = true
+    })
     await pb.collection('items').subscribe('*', async (e) => {
       if (e.action === 'delete') {
         const local = await db.items.get(e.record.id)
@@ -138,7 +158,9 @@ async function subscribe() {
     // List changes (renamed, someone added or removed) are rare: just resync.
     await pb.collection('lists').subscribe('*', () => schedule(0))
   } catch {
-    // Realtime is a bonus; regular syncs still run.
+    // Live updates are a bonus; syncs still run, and the next wake-up tries again.
+  } finally {
+    subscribing = false
   }
 }
 
@@ -153,7 +175,10 @@ function serverFields(item: Item): Record<string, unknown> {
     history: item.history ?? [],
     foundAt: item.foundAt ? iso(item.foundAt) : '',
   }
-  if (item.photoDirty) body.photo = item.photo ? new File([item.photo], 'spot.jpg', { type: item.photo.type || 'image/jpeg' }) : null
+  if (item.photoDirty) {
+    const blob = photoBlob(item.photo)
+    body.photo = blob ? new File([blob], 'spot.jpg', { type: blob.type || 'image/jpeg' }) : null
+  }
   return body
 }
 
@@ -261,17 +286,25 @@ async function photoUrl(rec: RecordModel) {
 async function applyRemote(rec: RecordModel) {
   const local = await db.items.get(rec.id)
   const remoteUpdated = parseDate(rec.updated)
-  // A newer local edit wins; it's pushed on the next sync.
-  if (local?.dirty && local.updatedAt >= remoteUpdated) return
+  // Unsent local changes win: they're pushed next, and the server's result comes back after.
+  // (Comparing clocks across devices is unreliable, and this also covers the echo of an
+  // upload that is still finishing.)
+  if (local?.dirty) return
   // Unchanged: skip, so the screen doesn't redraw for nothing.
   if (local && !local.dirty && local.updatedAt === remoteUpdated && (local.photoName ?? '') === (rec.photo ?? '')) return
 
   let photo = local?.photoName === rec.photo ? local?.photo : undefined
+  let photoName: string | undefined = rec.photo || undefined
   if (rec.photo && rec.photo !== local?.photoName) {
     try {
       const res = await fetch(await photoUrl(rec))
-      if (res.ok) photo = await res.blob()
+      if (res.ok) photo = await storePhoto(await res.blob())
     } catch {}
+    // Couldn't download it: keep what we have and try again next sync.
+    if (!photo) {
+      photo = local?.photo
+      photoName = local?.photoName
+    }
   }
   const item: Item = {
     id: rec.id,
@@ -285,7 +318,7 @@ async function applyRemote(rec: RecordModel) {
     createdAt: parseDate(rec.created),
     updatedAt: remoteUpdated,
     photo,
-    photoName: rec.photo || undefined,
+    photoName,
     dirty: 0,
     deleted: 0,
     synced: 1,

@@ -12,10 +12,21 @@
   let photoInput = $state<HTMLInputElement>()
   let note = $state<string | null>(null)
 
+  let photoBusy = $state(false)
   async function pickPhoto(e: Event) {
-    const file = (e.currentTarget as HTMLInputElement).files?.[0]
+    const input = e.currentTarget as HTMLInputElement
+    const file = input.files?.[0]
+    // Clear it, so picking the same file again still triggers a change.
+    input.value = ''
     if (!file || !item) return
-    await updateItem(item.id, { photo: await compressPhoto(file) })
+    photoBusy = true
+    try {
+      await updateItem(item.id, { photo: await compressPhoto(file) })
+    } catch {
+      showToast({ title: t('item.photoFailed') }, 5000)
+    } finally {
+      photoBusy = false
+    }
   }
 
   async function saveNote() {
@@ -69,15 +80,15 @@
         <span class="since muted"><Icon name="clock" size={20} stroke={2} />{t('item.since', { date: date(item.since, true) })}</span>
 
         {#if item.photo}
-          <Photo blob={item.photo} alt={t('item.photoAlt', { name: item.name })} />
+          <Photo photo={item.photo} alt={t('item.photoAlt', { name: item.name })} />
         {/if}
         {#if editable && item.photo}
           <div class="photo-actions">
-            <button type="button" class="chip" onclick={() => photoInput?.click()}><Icon name="camera" size={20} />{t('item.changePhoto')}</button>
+            <button type="button" class="chip" disabled={photoBusy} onclick={() => photoInput?.click()}><Icon name="camera" size={20} />{t('item.changePhoto')}</button>
             <button type="button" class="chip" onclick={() => updateItem(item.id, { photo: undefined })}><Icon name="trash" size={20} />{t('item.removePhoto')}</button>
           </div>
         {:else if editable}
-          <button type="button" class="add-photo photo-placeholder" onclick={() => photoInput?.click()}>
+          <button type="button" class="add-photo photo-placeholder" disabled={photoBusy} onclick={() => photoInput?.click()}>
             <span><Icon name="camera" size={22} />{t('item.addPhoto')}</span>
           </button>
         {/if}
