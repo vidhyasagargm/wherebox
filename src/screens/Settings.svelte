@@ -196,6 +196,7 @@
         </div>
         <div class="legal">
           <a href="#/privacy">{t('settings.privacy')}</a>
+          <a href="#/terms">{t('terms.title')}</a>
           {#if hasImprint}<a href="#/privacy?imprint=1">{t('settings.imprint')}</a>{/if}
         </div>
         <button type="button" class="btn-link" onclick={showIntro}>{t('settings.showIntro')}</button>
@@ -305,7 +306,8 @@
   }
   .legal {
     display: flex;
-    gap: 20px;
+    flex-wrap: wrap;
+    gap: 0 20px;
     font-size: 16px;
     font-weight: 600;
   }

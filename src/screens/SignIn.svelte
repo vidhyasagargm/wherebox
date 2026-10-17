@@ -119,7 +119,7 @@
         </div>
         <label class="consent">
           <input type="checkbox" bind:checked={consent} />
-          <span>{t('signin.consent')} <a href="#/privacy">{t('signin.privacy')}</a></span>
+          <span>{t('signin.consent')} <a href="#/terms">{t('terms.title')}</a> · <a href="#/privacy">{t('signin.privacy')}</a></span>
         </label>
       </form>
     {:else if step === 'code'}

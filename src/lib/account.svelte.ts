@@ -13,7 +13,9 @@ export const account = $state<{
   lastSync: number | null
   // The session ran out (e.g. offline for over 30 days); data stays, sync pauses until sign-in.
   expired: boolean
-}>({ user: null, status: 'idle', lastSync: null, expired: false })
+  // The privacy notice or terms changed since this account agreed; asked before continuing.
+  needsConsent: boolean
+}>({ user: null, status: 'idle', lastSync: null, expired: false, needsConsent: false })
 
 const AUTH_KEY = 'pocketbase_auth'
 // Fallback if the server can't be asked; must match the server's CONSENT_VERSION.
@@ -46,6 +48,19 @@ export async function restoreSession() {
   startSync(c)
 }
 
+// Compares what the account agreed to with the current version.
+export async function checkConsent(record: { [key: string]: unknown }) {
+  const current = await consentVersion()
+  const agreed = typeof record.consentVersion === 'string' ? record.consentVersion : ''
+  account.needsConsent = !!agreed && agreed !== current
+}
+
+export async function agreeToCurrent() {
+  const c = await client()
+  await c.send('/api/wb/me/consent', { method: 'POST', body: { version: await consentVersion() } })
+  account.needsConsent = false
+}
+
 export async function consentVersion(): Promise<string> {
   try {
     const r = await fetch('/api/wb/consent')
@@ -67,6 +82,7 @@ export async function verifyCode(otpId: string, code: string) {
   const auth = await c.collection('users').authWithOTP(otpId, code.replace(/\D/g, ''))
   account.user = toUser(auth.record)
   account.expired = false
+  await checkConsent(auth.record)
   // Make sure there's a list to sync into.
   const { ensureList, startSync } = await import('./sync')
   const list = await ensureList(c)
@@ -104,6 +120,7 @@ export async function signOut() {
   account.status = 'idle'
   account.lastSync = null
   account.expired = false
+  account.needsConsent = false
   settings.activeList = LOCAL
   saveSettings()
 }

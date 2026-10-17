@@ -268,6 +268,22 @@ routerAdd('GET', '/api/wb/consent', (e) => {
   return e.json(200, { version: wb.CONSENT_VERSION })
 })
 
+// Agree to the current privacy notice and terms (after they changed).
+routerAdd(
+  'POST',
+  '/api/wb/me/consent',
+  (e) => {
+    const wb = require(`${__hooks}/lib/wb.js`)
+    if ((e.requestInfo().body || {}).version !== wb.CONSENT_VERSION) throw new BadRequestError('Please agree to the current version.')
+    const u = e.app.findRecordById('users', e.auth.id)
+    u.set('consentAt', new Date().toISOString())
+    u.set('consentVersion', wb.CONSENT_VERSION)
+    e.app.unsafeWithoutHooks().save(u)
+    return e.json(200, { consentVersion: wb.CONSENT_VERSION, consentAt: u.getString('consentAt') })
+  },
+  $apis.requireAuth('users'),
+)
+
 // --- Housekeeping ---
 
 cronAdd('wherebox-cleanup', '17 3 * * *', () => {
@@ -275,6 +291,25 @@ cronAdd('wherebox-cleanup', '17 3 * * *', () => {
   const r = wb.cleanup($app)
   $app.logger().info('wherebox cleanup', 'unverified', r.unverified, 'warned', r.warned, 'deleted', r.deleted, 'invites', r.invites)
 })
+
+// Delete an account on request (superusers only, e.g. for a deletion request by email).
+// Same clean-up as the user's own "Delete my account". Not reachable through nginx.
+routerAdd(
+  'DELETE',
+  '/api/wb/admin/users/{id}',
+  (e) => {
+    const wb = require(`${__hooks}/lib/wb.js`)
+    let user
+    try {
+      user = e.app.findRecordById('users', e.request.pathValue('id'))
+    } catch (_) {
+      throw new NotFoundError('User not found.')
+    }
+    wb.deleteUser(e.app, user)
+    return e.noContent(204)
+  },
+  $apis.requireSuperuserAuth(),
+)
 
 // Run the housekeeping now (superusers only), e.g. for testing.
 routerAdd(

@@ -146,6 +146,16 @@ describe('sign-up and sign-in', () => {
     assert.match(r.json.version, /^\d{4}-\d{2}-\d{2}$/)
   })
 
+  it('records agreement to the current version only', async () => {
+    const a = await signIn('consent@test.local')
+    assert.equal((await call('POST', '/api/wb/me/consent', { token: a.token, body: { version: '2000-01-01' } })).status, 400)
+    const version = (await call('GET', '/api/wb/consent')).json.version
+    const r = await call('POST', '/api/wb/me/consent', { token: a.token, body: { version } })
+    assert.equal(r.status, 200)
+    assert.equal(r.json.consentVersion, version)
+    assert.equal((await call('POST', '/api/wb/me/consent', { body: { version } })).status, 401)
+  })
+
   it('has no password sign-in', async () => {
     const r = await call('POST', '/api/collections/users/auth-with-password', { body: { identity: 'alice@test.local', password: 'x' } })
     assert.notEqual(r.status, 200)
@@ -322,12 +332,20 @@ describe('GDPR', () => {
     assert.equal(keptItem.createdBy, '')
   })
 
+  it('lets a superuser delete an account on request, and nobody else', async () => {
+    const zoe = await signIn('zoe@test.local')
+    assert.equal((await call('DELETE', `/api/wb/admin/users/${zoe.id}`, { token: zoe.token })).status, 403)
+    const admin = await adminToken()
+    assert.equal((await call('DELETE', `/api/wb/admin/users/${zoe.id}`, { token: admin })).status, 204)
+    assert.equal((await call('GET', `/api/collections/users/records/${zoe.id}`, { token: admin })).status, 404)
+  })
+
   it('removes unconfirmed sign-ups and expired invites in the daily cleanup', async () => {
     const admin = (await call('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: ADMIN.email, password: ADMIN.password } })).json.token
     const r = await call('POST', '/api/wb/admin/cleanup', { token: admin })
     assert.equal(r.status, 200)
     assert.equal(typeof r.json.unverified, 'number')
-    assert.equal((await call('POST', '/api/wb/admin/cleanup', { token: (await signIn('alice@test.local')).token })).status, 403)
+    assert.equal((await call('POST', '/api/wb/admin/cleanup', { token: (await signIn('cleanup@test.local')).token })).status, 403)
   })
 
   it('does not store IP addresses in request logs', async () => {

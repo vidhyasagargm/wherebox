@@ -25,6 +25,20 @@
     showToast({ title: t('account.saved') }, 2000)
   }
 
+  let downloading = $state(false)
+  async function download() {
+    downloading = true
+    try {
+      const { downloadMyData } = await import('../lib/gdpr')
+      await downloadMyData()
+      showToast({ title: t('data.downloaded') }, 3000)
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') showToast({ title: navigator.onLine ? t('lists.failed') : t('lists.offline') }, 4000)
+    } finally {
+      downloading = false
+    }
+  }
+
   async function out() {
     if (confirm(t('account.signOutConfirm'))) await signOut()
   }
@@ -46,6 +60,12 @@
       <label for="acct-name">{t('account.name')}</label>
       <input id="acct-name" class="input" bind:value={name} onblur={saveName} maxlength="50" autocomplete="given-name" />
       <span class="hint muted">{t('account.nameHint')}</span>
+    </div>
+    <div class="data">
+      <h3>{t('data.title')}</h3>
+      <p class="hint muted">{t('data.downloadHint')}</p>
+      <button type="button" class="btn" onclick={download} disabled={downloading}><Icon name="download" />{t('data.download')}</button>
+      <a class="btn btn-danger" href="#/delete-account"><Icon name="trash" />{t('data.delete')}</a>
     </div>
     <button type="button" class="btn-link" onclick={out}>{t('account.signOut')}</button>
   {:else}
@@ -78,6 +98,18 @@
   .status.warn {
     color: var(--danger);
     font-weight: 600;
+  }
+  .data {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 14px;
+    margin-top: 4px;
+    border-top: 1px solid var(--divider);
+  }
+  h3 {
+    margin: 0;
+    font-size: 18px;
   }
   .pitch {
     font-size: 17px;

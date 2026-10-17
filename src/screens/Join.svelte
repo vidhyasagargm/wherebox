@@ -7,6 +7,7 @@
   import { acceptInvite, previewInvite, rememberInvite, type InvitePreview } from '../lib/lists'
   import { go, route } from '../lib/router.svelte'
   import { showToast } from '../lib/store.svelte'
+  import { isIOS, isStandalone } from '../lib/speech'
 
   const token = route.current.param
   let preview = $state<InvitePreview | null>(null)
@@ -59,6 +60,9 @@
         {preview.inviter ? t('join.text', { inviter: preview.inviter, list: preview.list }) : t('join.textNoName', { list: preview.list })}
       </p>
       <p class="muted lead">{preview.role === 'editor' ? t('join.canEdit') : t('join.canView')}</p>
+      {#if isIOS && !isStandalone()}
+        <p class="hint"><Icon name="phone" size={22} stroke={2} /><span>{t('join.iosHint')}</span></p>
+      {/if}
     {/if}
   </main>
   {#if preview && !invalid}
@@ -85,6 +89,20 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+  .hint {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: var(--tint);
+    color: var(--accent-text);
+    font-size: 16px;
+    line-height: 1.45;
+  }
+  .hint :global(svg) {
+    flex-shrink: 0;
   }
   .lead {
     font-size: 19px;

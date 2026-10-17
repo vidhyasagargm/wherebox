@@ -6,7 +6,7 @@
 // - Conflicts: the most recent edit wins.
 import type PocketBase from 'pocketbase'
 import type { RecordModel } from 'pocketbase'
-import { account } from './account.svelte'
+import { account, checkConsent } from './account.svelte'
 import { changes, db, isAccountList, type Item, type List, type Role } from './db'
 import { t } from './i18n'
 import { saveSettings, settings } from './settings.svelte'
@@ -62,6 +62,7 @@ export function startSync(c: PocketBase) {
   // Renewing the session also tells the server the account is in use (see the inactivity clean-up).
   c.collection('users')
     .authRefresh()
+    .then((r) => checkConsent(r.record))
     .catch((e) => {
       if (e?.status === 401) expired()
     })

@@ -31,19 +31,21 @@ export async function exportBackup(): Promise<void> {
     rooms,
   }
   const name = `wherebox-backup-${new Date().toISOString().slice(0, 10)}.json`
-  const file = new File([JSON.stringify(backup)], name, { type: 'application/json' })
+  await saveFile(new File([JSON.stringify(backup)], name, { type: 'application/json' }))
+}
 
-  // On phones the share sheet lets people pick Files, Drive, email or a messenger.
+// Hands a file to the user: the share sheet on phones (Files, Drive, email…), a download elsewhere.
+export async function saveFile(file: File) {
   if (navigator.canShare?.({ files: [file] }) && matchMedia('(pointer: coarse)').matches) {
     try {
-      await navigator.share({ files: [file], title: name })
+      await navigator.share({ files: [file], title: file.name })
       return
     } catch (e) {
       if ((e as Error).name === 'AbortError') throw e
     }
   }
   const url = URL.createObjectURL(file)
-  const a = Object.assign(document.createElement('a'), { href: url, download: name })
+  const a = Object.assign(document.createElement('a'), { href: url, download: file.name })
   document.body.append(a)
   a.click()
   a.remove()
