@@ -2,14 +2,17 @@
   import { t } from '../lib/i18n'
   import { DAY, saveSettings, settings } from '../lib/settings.svelte'
   import { data } from '../lib/store.svelte'
+  import { isAccountList } from '../lib/db'
   import Icon from './Icon.svelte'
 
   const now = Date.now()
   const oldest = $derived(Math.min(now, ...data.items.map((i) => i.createdAt)))
   const days = $derived(settings.lastBackup ? Math.floor((now - settings.lastBackup) / DAY) : null)
   // Noticeable but not nagging: only once there's something worth losing, and snoozable for a week.
+  // Synced lists are kept in the account, so only device-only lists get the reminder.
   const show = $derived(
-    data.items.length >= 3 && now > settings.backupSnoozedUntil && (days === null ? now - oldest > 3 * DAY : days >= 30),
+    !isAccountList(settings.activeList) &&
+      data.items.length >= 3 && now > settings.backupSnoozedUntil && (days === null ? now - oldest > 3 * DAY : days >= 30),
   )
 
   function later() {

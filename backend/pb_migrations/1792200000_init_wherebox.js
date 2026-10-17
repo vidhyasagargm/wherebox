@@ -24,6 +24,8 @@ migrate(
     users.otp.enabled = true
     users.otp.length = 6
     users.otp.duration = 600
+    // Stay signed in for 30 days; every app start online renews it.
+    users.authToken.duration = 30 * 24 * 60 * 60
     users.otp.emailTemplate.subject = 'Your Wherebox code: {OTP} / Dein Wherebox-Code: {OTP}'
     users.otp.emailTemplate.body = OTP_BODY
     users.mfa.enabled = false

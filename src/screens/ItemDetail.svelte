@@ -26,8 +26,10 @@
 
   async function remove() {
     if (!item || !confirm(t('item.deleteConfirm', { name: item.name }))) return
+    // Read the name first: once deleted, `item` is gone.
+    const name = item.name
     await deleteItem(item.id)
-    showToast({ title: t('item.deleted'), text: item.name }, 3000)
+    showToast({ title: t('item.deleted'), text: name }, 3000)
     go('', {}, true)
   }
 

@@ -10,8 +10,21 @@
   import { canListen } from '../lib/speech'
   import { data, handle } from '../lib/store.svelte'
   import { unlockTalk } from '../lib/talk'
+  import { account } from '../lib/account.svelte'
 
   let { compact = false }: { compact?: boolean } = $props()
+
+  const syncLabel = $derived(
+    account.expired
+      ? t('account.expired')
+      : account.status === 'offline'
+        ? t('account.offline')
+        : account.status === 'error'
+          ? t('account.error')
+          : account.status === 'syncing'
+            ? t('account.syncing')
+            : t('account.synced', { when: '' }).trim(),
+  )
 
   let text = $state('')
   let input: HTMLInputElement
@@ -58,6 +71,11 @@
   {#if !compact}
     <header class="head">
       <span class="brand"><Logo /><span>{t('appName')}</span></span>
+      {#if account.user}
+        <a class="sync" class:warn={account.expired || account.status === 'error'} href="#/settings" aria-label={`${t('account.status')}: ${syncLabel}`}>
+          <Icon name={account.status === 'offline' ? 'cloudOff' : account.status === 'syncing' ? 'sync' : account.expired || account.status === 'error' ? 'alert' : 'cloudCheck'} size={24} stroke={2} />
+        </a>
+      {/if}
       <button type="button" class="chip" aria-label={t('lang.switch')} onclick={toggleLang}>
         <span aria-hidden="true">{settings.lang === 'en' ? 'EN' : 'DE'} / {settings.lang === 'en' ? 'DE' : 'EN'}</span>
       </button>
@@ -127,13 +145,30 @@
     justify-content: space-between;
     padding-top: 4px;
   }
+  .head {
+    gap: 8px;
+  }
   .brand {
+    flex: 1;
+
     display: flex;
     align-items: center;
     gap: 10px;
     font-weight: 800;
     font-size: 19px;
     letter-spacing: -0.01em;
+  }
+  .sync {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+  }
+  .sync.warn {
+    color: var(--danger);
   }
   .ask {
     display: flex;

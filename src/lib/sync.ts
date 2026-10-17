@@ -1,0 +1,283 @@
+// Two-way sync between this device and the account's lists.
+//
+// - Every change is saved locally first and marked dirty (works offline).
+// - A sync pushes dirty items, then pulls the server's current state.
+// - Realtime events bring other people's changes in right away.
+// - Conflicts: the most recent edit wins.
+import type PocketBase from 'pocketbase'
+import type { RecordModel } from 'pocketbase'
+import { account } from './account.svelte'
+import { changes, db, isAccountList, type Item, type List, type Role } from './db'
+import { t } from './i18n'
+import { saveSettings, settings } from './settings.svelte'
+
+let pb: PocketBase | null = null
+let running: Promise<void> | null = null
+let again = false
+let timer: ReturnType<typeof setTimeout> | undefined
+const cleanups: (() => void)[] = []
+
+// PocketBase dates look like "2026-10-17 10:00:00.000Z"; Safari only parses them with a "T".
+const parseDate = (s: string) => (s ? Date.parse(s.replace(' ', 'T')) : NaN)
+const iso = (ms: number) => new Date(ms).toISOString()
+
+function roleFor(rec: RecordModel, userId: string): Role | null {
+  if (rec.owner === userId) return 'owner'
+  if ((rec.editors as string[]).includes(userId)) return 'editor'
+  if ((rec.viewers as string[]).includes(userId)) return 'viewer'
+  return null
+}
+
+const toList = (rec: RecordModel, userId: string): List | null => {
+  const role = roleFor(rec, userId)
+  return role ? { id: rec.id, name: rec.name, role } : null
+}
+
+export async function ensureList(c: PocketBase): Promise<List> {
+  const userId = c.authStore.record!.id
+  const lists = (await c.collection('lists').getFullList()).map((r) => toList(r, userId)).filter((l): l is List => !!l)
+  const own = lists.find((l) => l.role === 'owner') ?? lists[0]
+  if (own) {
+    await db.lists.bulkPut(lists)
+    return own
+  }
+  const created = toList(await c.collection('lists').create({ name: t('lists.defaultName') }), userId)!
+  await db.lists.put(created)
+  return created
+}
+
+export function startSync(c: PocketBase) {
+  pb = c
+  const onChange = () => schedule(800)
+  const onOnline = () => schedule(0)
+  const onVisible = () => document.visibilityState === 'visible' && schedule(0)
+  changes.addEventListener('change', onChange)
+  addEventListener('online', onOnline)
+  document.addEventListener('visibilitychange', onVisible)
+  cleanups.push(
+    () => changes.removeEventListener('change', onChange),
+    () => removeEventListener('online', onOnline),
+    () => document.removeEventListener('visibilitychange', onVisible),
+  )
+  // Renewing the session also tells the server the account is in use (see the inactivity clean-up).
+  c.collection('users')
+    .authRefresh()
+    .catch((e) => {
+      if (e?.status === 401) expired()
+    })
+    .finally(() => {
+      syncNow()
+      subscribe()
+    })
+}
+
+export function stopSync() {
+  clearTimeout(timer)
+  while (cleanups.length) cleanups.pop()!()
+  pb?.realtime.unsubscribe().catch(() => {})
+  pb = null
+}
+
+function schedule(ms: number) {
+  clearTimeout(timer)
+  timer = setTimeout(syncNow, ms)
+}
+
+export function syncNow(): Promise<void> {
+  if (!pb || account.expired) return Promise.resolve()
+  if (running) {
+    again = true
+    return running
+  }
+  running = (async () => {
+    account.status = 'syncing'
+    try {
+      do {
+        again = false
+        await push()
+        await pull()
+      } while (again)
+      account.status = 'idle'
+      account.lastSync = Date.now()
+    } catch (e) {
+      handleError(e)
+    } finally {
+      running = null
+    }
+  })()
+  return running
+}
+
+function handleError(e: unknown) {
+  const status = (e as { status?: number })?.status
+  if (status === 401) expired()
+  else if (status === 0 || !navigator.onLine) account.status = 'offline'
+  else {
+    account.status = 'error'
+    console.warn('sync failed', e)
+  }
+}
+
+function expired() {
+  account.expired = true
+  account.status = 'idle'
+}
+
+async function subscribe() {
+  if (!pb) return
+  const userId = pb.authStore.record?.id
+  if (!userId) return
+  try {
+    await pb.collection('items').subscribe('*', async (e) => {
+      if (e.action === 'delete') {
+        const local = await db.items.get(e.record.id)
+        if (local && !local.dirty) await db.items.delete(e.record.id)
+      } else await applyRemote(e.record)
+    })
+    // List changes (renamed, someone added or removed) are rare: just resync.
+    await pb.collection('lists').subscribe('*', () => schedule(0))
+  } catch {
+    // Realtime is a bonus; regular syncs still run.
+  }
+}
+
+// --- Push: send local changes ---
+
+function serverFields(item: Item): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    name: item.name,
+    where: item.where,
+    since: iso(item.since),
+    note: item.note ?? '',
+    history: item.history ?? [],
+    foundAt: item.foundAt ? iso(item.foundAt) : '',
+  }
+  if (item.photoDirty) body.photo = item.photo ? new File([item.photo], 'spot.jpg', { type: item.photo.type || 'image/jpeg' }) : null
+  return body
+}
+
+async function push() {
+  const c = pb!
+  const lists = new Map((await db.lists.toArray()).map((l) => [l.id, l]))
+  const dirty = (await db.items.where('dirty').equals(1).toArray()).filter((i) => isAccountList(i.listId))
+  const col = c.collection('items')
+
+  for (const item of dirty) {
+    const list = lists.get(item.listId)
+    // No longer a member, or only allowed to view: the next pull restores the server's version.
+    if (!list || list.role === 'viewer') {
+      await db.items.update(item.id, { dirty: 0 })
+      continue
+    }
+    try {
+      if (item.deleted) {
+        await col.delete(item.id).catch((e) => {
+          if (e?.status !== 404) throw e
+        })
+        await db.items.delete(item.id)
+        continue
+      }
+      const body = serverFields(item)
+      let rec: RecordModel
+      if (item.synced) {
+        rec = await col.update(item.id, body).catch((e) => {
+          if (e?.status === 404) return col.create({ ...body, id: item.id, list: item.listId })
+          throw e
+        })
+      } else {
+        rec = await col.create({ ...body, id: item.id, list: item.listId }).catch((e) => {
+          // Created earlier but the reply never arrived: it already exists.
+          if (e?.status === 400 && e?.response?.data?.id) return col.update(item.id, body)
+          throw e
+        })
+      }
+      // Only mark clean if nothing changed locally while we were sending.
+      await db.transaction('rw', db.items, async () => {
+        const now = await db.items.get(item.id)
+        if (!now) return
+        const clean = now.updatedAt === item.updatedAt
+        await db.items.update(item.id, { synced: 1, photoName: rec.photo || undefined, ...(clean ? { dirty: 0, photoDirty: 0 } : {}) })
+      })
+    } catch (e) {
+      const status = (e as { status?: number })?.status
+      // Rejected by the server (e.g. invalid or not allowed): drop the change instead of retrying forever.
+      if (status && status >= 400 && status < 500 && status !== 401 && status !== 429) {
+        console.warn('change rejected', item.id, e)
+        await db.items.update(item.id, { dirty: 0 })
+      } else throw e
+    }
+  }
+}
+
+// --- Pull: bring this device up to date with the server ---
+
+async function pull() {
+  const c = pb!
+  const userId = c.authStore.record!.id
+
+  const remoteLists = (await c.collection('lists').getFullList()).map((r) => toList(r, userId)).filter((l): l is List => !!l)
+  const listIds = new Set(remoteLists.map((l) => l.id))
+  const goneLists = (await db.lists.toArray()).filter((l) => !listIds.has(l.id)).map((l) => l.id)
+  await db.transaction('rw', db.items, db.lists, async () => {
+    await db.lists.bulkPut(remoteLists)
+    for (const id of goneLists) {
+      await db.lists.delete(id)
+      await db.items.where('listId').equals(id).delete()
+    }
+  })
+  // The list on screen was removed or left: show another one.
+  if (isAccountList(settings.activeList) && !listIds.has(settings.activeList)) {
+    settings.activeList = remoteLists.find((l) => l.role === 'owner')?.id ?? remoteLists[0]?.id ?? 'local'
+    saveSettings()
+  }
+
+  const remote = await c.collection('items').getFullList({ batch: 500 })
+  const remoteIds = new Set(remote.map((r) => r.id))
+  for (const rec of remote) await applyRemote(rec)
+
+  // Deleted on the server by someone else.
+  const stale = (await db.items.toArray()).filter((i) => listIds.has(i.listId) && i.synced && !i.dirty && !remoteIds.has(i.id))
+  await db.items.bulkDelete(stale.map((i) => i.id))
+}
+
+let fileToken: { value: string; at: number } | null = null
+async function photoUrl(rec: RecordModel) {
+  if (!fileToken || Date.now() - fileToken.at > 60_000) fileToken = { value: await pb!.files.getToken(), at: Date.now() }
+  return pb!.files.getURL(rec, rec.photo, { token: fileToken.value })
+}
+
+async function applyRemote(rec: RecordModel) {
+  const local = await db.items.get(rec.id)
+  const remoteUpdated = parseDate(rec.updated)
+  // A newer local edit wins; it's pushed on the next sync.
+  if (local?.dirty && local.updatedAt >= remoteUpdated) return
+  // Unchanged: skip, so the screen doesn't redraw for nothing.
+  if (local && !local.dirty && local.updatedAt === remoteUpdated && (local.photoName ?? '') === (rec.photo ?? '')) return
+
+  let photo = local?.photoName === rec.photo ? local?.photo : undefined
+  if (rec.photo && rec.photo !== local?.photoName) {
+    try {
+      const res = await fetch(await photoUrl(rec))
+      if (res.ok) photo = await res.blob()
+    } catch {}
+  }
+  const item: Item = {
+    id: rec.id,
+    listId: rec.list,
+    name: rec.name,
+    where: rec.where,
+    since: parseDate(rec.since),
+    note: rec.note || undefined,
+    history: Array.isArray(rec.history) ? rec.history : [],
+    foundAt: rec.foundAt ? parseDate(rec.foundAt) : undefined,
+    createdAt: parseDate(rec.created),
+    updatedAt: remoteUpdated,
+    photo,
+    photoName: rec.photo || undefined,
+    dirty: 0,
+    deleted: 0,
+    synced: 1,
+    photoDirty: 0,
+  }
+  await db.items.put(item)
+}

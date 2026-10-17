@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import AccountCard from '../components/AccountCard.svelte'
+  import { isAccountList } from '../lib/db'
   import Icon from '../components/Icon.svelte'
   import { exportBackup, importBackup, readBackup } from '../lib/backup'
   import { date, t } from '../lib/i18n'
@@ -90,6 +92,11 @@
   <main>
     <h1 tabindex="-1" class="title">{t('settings.title')}</h1>
 
+    <section aria-labelledby="acct">
+      <h2 id="acct">{t('account.title')}</h2>
+      <AccountCard />
+    </section>
+
     <section aria-labelledby="backup">
       <h2 id="backup">{t('settings.backup')}</h2>
       <div class="card backup">
@@ -98,7 +105,11 @@
           <strong>{settings.lastBackup ? date(settings.lastBackup, true) : t('settings.never')}</strong>
           {#if days !== null && days >= 30}<span class="warn">{t('settings.ago', { n: days })}</span>{/if}
         </div>
-        <p class="note"><Icon name="alert" size={22} stroke={2} /><span>{t('settings.warning')}</span></p>
+        {#if isAccountList(settings.activeList)}
+          <p class="note"><Icon name="cloudCheck" size={22} stroke={2} /><span>{t('settings.warningSynced')}</span></p>
+        {:else}
+          <p class="note"><Icon name="alert" size={22} stroke={2} /><span>{t('settings.warning')}</span></p>
+        {/if}
         {#if persisted}<p class="ok"><Icon name="shield" size={20} stroke={2} />{t('settings.persisted')}</p>{/if}
         <button type="button" class="btn btn-primary" onclick={doExport} disabled={!data.items.length}><Icon name="download" />{t('settings.export')}</button>
         <button type="button" class="btn" onclick={() => fileInput.click()}><Icon name="upload" />{t('settings.import')}</button>

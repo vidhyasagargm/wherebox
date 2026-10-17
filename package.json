@@ -10,7 +10,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
     "test": "vitest run",
     "icons": "node scripts/icons.mjs",
-    "test:backend": "node --test backend/test/*.test.mjs"
+    "test:backend": "node --test backend/test/*.test.mjs",
+    "backend": "backend/.bin/pocketbase serve --dir backend/pb_data --migrationsDir backend/pb_migrations --hooksDir backend/pb_hooks"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
@@ -26,7 +27,8 @@
   },
   "dependencies": {
     "@fontsource-variable/schibsted-grotesk": "^5.3.0",
-    "dexie": "^4.4.6"
+    "dexie": "^4.4.6",
+    "pocketbase": "^0.28.1"
   },
   "allowScripts": {
     "sharp@0.35.5": true

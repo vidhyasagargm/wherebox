@@ -14,10 +14,12 @@
   import Onboarding from './screens/Onboarding.svelte'
   import Places from './screens/Places.svelte'
   import Privacy from './screens/Privacy.svelte'
+  import SignIn from './screens/SignIn.svelte'
+  import { restoreSession } from './lib/account.svelte'
   import Settings from './screens/Settings.svelte'
   import Voice from './screens/Voice.svelte'
 
-  const screens = { find: Find, item: ItemDetail, confirm: Confirm, places: Places, settings: Settings, listen: Voice, welcome: Onboarding, privacy: Privacy }
+  const screens = { find: Find, item: ItemDetail, confirm: Confirm, places: Places, settings: Settings, listen: Voice, welcome: Onboarding, privacy: Privacy, signin: SignIn }
   // On wide screens these open beside Home instead of replacing it.
   const sideBySide = new Set(['home', 'find', 'item', 'confirm'])
 
@@ -35,6 +37,7 @@
 
   onMount(() => {
     applyTheme()
+    restoreSession()
     const dark = matchMedia('(prefers-color-scheme: dark)')
     dark.addEventListener('change', applyTheme)
     const mq = matchMedia('(min-width: 900px)')

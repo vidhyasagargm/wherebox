@@ -1,8 +1,9 @@
 <script lang="ts">
   import Icon from '../components/Icon.svelte'
-  import { db, renamePlace } from '../lib/db'
+  import { db, deleteItems, renamePlace } from '../lib/db'
   import { t } from '../lib/i18n'
   import { escapeRe, ROOMS, splitPlace } from '../lib/parser'
+  import { settings } from '../lib/settings.svelte'
   import { data, places, showToast } from '../lib/store.svelte'
 
   const groups = $derived(places(data.items, data.rooms))
@@ -37,9 +38,9 @@
     if (spot === undefined) {
       const known = [...ROOMS.en, ...ROOMS.de, ...data.rooms].some((r) => r.toLocaleLowerCase() === name.toLocaleLowerCase())
       if (!known) await db.rooms.put({ name })
-      await renamePlace((where) => (splitPlace(where, data.rooms).room === room ? replaceFirst(where, room, name) : null))
+      await renamePlace(settings.activeList, (where) => (splitPlace(where, data.rooms).room === room ? replaceFirst(where, room, name) : null))
     } else {
-      await renamePlace((where) => {
+      await renamePlace(settings.activeList, (where) => {
         const p = splitPlace(where, data.rooms)
         if (p.room !== room || p.spot !== spot) return null
         if (!spot) return `${where} ${name}`
@@ -60,7 +61,7 @@
       .map((i) => i.id)
     const label = spot ?? (room || t('places.other'))
     if (!confirm(t('places.deleteConfirm', { name: label, n: ids.length }))) return
-    await db.items.bulkDelete(ids)
+    await deleteItems(ids)
     showToast({ title: t('places.deleted'), text: label }, 3000)
   }
 

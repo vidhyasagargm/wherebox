@@ -1,14 +1,15 @@
 import { liveQuery } from 'dexie'
 import { shouldTalk, spoken as words, talk } from './answers'
-import { db, persistStorage, saveItem, undoSave, type Item } from './db'
+import { db, persistStorage, saveItem, undoSave, visible, type Item, type List } from './db'
 import { t } from './i18n'
 import { parse, splitPlace } from './parser'
 import { go } from './router.svelte'
 import { settings } from './settings.svelte'
 
-export const data = $state<{ items: Item[]; rooms: string[]; loaded: boolean; storageError: boolean }>({
+export const data = $state<{ items: Item[]; rooms: string[]; lists: List[]; loaded: boolean; storageError: boolean }>({
   items: [],
   rooms: [],
+  lists: [],
   loaded: false,
   storageError: false,
 })
@@ -22,13 +23,23 @@ const blocked = () => {
 // Live queries stay silent when the database can't open, so check it directly.
 db.open().catch(blocked)
 
-liveQuery(() => db.items.orderBy('updatedAt').reverse().toArray()).subscribe({
-  next: (items) => {
-    data.items = items
-    data.loaded = true
-  },
-  error: blocked,
+// The screen shows one list at a time; re-query whenever the active list changes.
+$effect.root(() => {
+  $effect(() => {
+    const listId = settings.activeList
+    const sub = liveQuery(async () =>
+      (await db.items.where('listId').equals(listId).toArray()).filter(visible).sort((a, b) => b.updatedAt - a.updatedAt),
+    ).subscribe({
+      next: (items) => {
+        data.items = items
+        data.loaded = true
+      },
+      error: blocked,
+    })
+    return () => sub.unsubscribe()
+  })
 })
+liveQuery(() => db.lists.toArray()).subscribe({ next: (lists) => (data.lists = lists), error: blocked })
 liveQuery(() => db.rooms.toArray()).subscribe({ next: (rooms) => (data.rooms = rooms.map((r) => r.name)), error: blocked })
 
 export type Toast = { id: number; title: string; text?: string; undo?: () => Promise<void>; edit?: () => void }
@@ -53,7 +64,7 @@ export function hideToast() {
 }
 
 export async function save(what: string, where: string, id?: string, spoken = false) {
-  const result = await saveItem(what, where, id)
+  const result = await saveItem(settings.activeList, what, where, id)
   if (shouldTalk(spoken)) talk(words.saved(result.moved, result.item))
   // First save is the right moment to ask the browser to keep our data.
   if (data.items.length <= 1) persistStorage()

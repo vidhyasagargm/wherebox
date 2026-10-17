@@ -9,6 +9,8 @@ type Settings = {
   lang: Lang
   theme: Theme
   readAloud: ReadAloud
+  // Which list the app shows: 'local' (this device only) or an account list id.
+  activeList: string
   onboarded: boolean
   voiceNoticeSeen: boolean
   lastBackup: number | null
@@ -24,6 +26,7 @@ const defaults: Settings = {
   lang: browserLang,
   theme: 'system',
   readAloud: 'voice',
+  activeList: 'local',
   onboarded: false,
   voiceNoticeSeen: false,
   lastBackup: null,

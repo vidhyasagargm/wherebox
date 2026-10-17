@@ -26,6 +26,11 @@
     plus: '<path d="M12 5v14M5 12h14"/>',
     keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
     speaker: '<path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"/>',
+    cloud: '<path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6 9.5 4.25 4.25 0 0 0 7 18z"/>',
+    cloudCheck: '<path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6 9.5 4.25 4.25 0 0 0 7 18z"/><path d="m9.5 13 2 2 3.5-3.5"/>',
+    cloudOff: '<path d="M7 18h10a4 4 0 0 0 1.8-.43M20.6 14.8A4 4 0 0 0 17.5 10 6 6 0 0 0 9.2 5.2M6 9.5A4.25 4.25 0 0 0 7 18"/><path d="M3 3l18 18"/>',
+    sync: '<path d="M20 12a8 8 0 0 1-14.3 4.9M4 12A8 8 0 0 1 18.3 7.1"/><path d="M18 3v4.5h-4.5M6 21v-4.5h4.5"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
     bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
   } as const
   export type IconName = keyof typeof paths
