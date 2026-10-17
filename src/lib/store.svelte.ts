@@ -1,14 +1,15 @@
 import { liveQuery } from 'dexie'
 import { shouldTalk, spoken as words, talk } from './answers'
-import { db, persistStorage, saveItem, undoSave, type Item } from './db'
+import { db, isAccountList, persistStorage, saveItem, undoSave, visible, type Item, type List, type Role } from './db'
 import { t } from './i18n'
 import { parse, splitPlace } from './parser'
 import { go } from './router.svelte'
 import { settings } from './settings.svelte'
 
-export const data = $state<{ items: Item[]; rooms: string[]; loaded: boolean; storageError: boolean }>({
+export const data = $state<{ items: Item[]; rooms: string[]; lists: List[]; loaded: boolean; storageError: boolean }>({
   items: [],
   rooms: [],
+  lists: [],
   loaded: false,
   storageError: false,
 })
@@ -22,14 +23,42 @@ const blocked = () => {
 // Live queries stay silent when the database can't open, so check it directly.
 db.open().catch(blocked)
 
-liveQuery(() => db.items.orderBy('updatedAt').reverse().toArray()).subscribe({
-  next: (items) => {
-    data.items = items
-    data.loaded = true
-  },
-  error: blocked,
+// The screen shows one list at a time; re-query whenever the active list changes.
+$effect.root(() => {
+  $effect(() => {
+    const listId = settings.activeList
+    const sub = liveQuery(async () =>
+      (await db.items.where('listId').equals(listId).toArray()).filter(visible).sort((a, b) => b.updatedAt - a.updatedAt),
+    ).subscribe({
+      next: (items) => {
+        data.items = items
+        data.loaded = true
+      },
+      error: blocked,
+    })
+    return () => sub.unsubscribe()
+  })
 })
+liveQuery(() => db.lists.toArray()).subscribe({ next: (lists) => (data.lists = lists), error: blocked })
 liveQuery(() => db.rooms.toArray()).subscribe({ next: (rooms) => (data.rooms = rooms.map((r) => r.name)), error: blocked })
+
+// Your role in a list. The device-only list is always yours.
+export function listRole(listId: string): Role {
+  if (!isAccountList(listId)) return 'owner'
+  return data.lists.find((l) => l.id === listId)?.role ?? 'viewer'
+}
+
+export const activeRole = () => listRole(settings.activeList)
+
+export const canEdit = () => activeRole() !== 'viewer'
+
+export function activeListName(): string {
+  if (!isAccountList(settings.activeList)) return t('lists.device')
+  const list = data.lists.find((l) => l.id === settings.activeList)
+  if (!list) return ''
+  // "Home · Sagar" for someone else's list, so it isn't mixed up with your own "Home".
+  return list.role !== 'owner' && list.ownerName ? `${list.name} · ${list.ownerName}` : list.name
+}
 
 export type Toast = { id: number; title: string; text?: string; undo?: () => Promise<void>; edit?: () => void }
 
@@ -53,7 +82,11 @@ export function hideToast() {
 }
 
 export async function save(what: string, where: string, id?: string, spoken = false) {
-  const result = await saveItem(what, where, id)
+  if (!canEdit()) {
+    showToast({ title: t('lists.viewOnly') }, 4000)
+    return null
+  }
+  const result = await saveItem(settings.activeList, what, where, id)
   if (shouldTalk(spoken)) talk(words.saved(result.moved, result.item))
   // First save is the right moment to ask the browser to keep our data.
   if (data.items.length <= 1) persistStorage()
@@ -73,6 +106,12 @@ export async function save(what: string, where: string, id?: string, spoken = fa
 // `spoken` means the user asked by voice, so the answer is read aloud too.
 export async function handle(text: string, opts: { replace?: boolean; spoken?: boolean } = {}) {
   const parsed = parse(text, settings.lang)
+  if (parsed.kind !== 'ask' && !canEdit()) {
+    showToast({ title: t('lists.viewOnly') }, 4000)
+    if (shouldTalk(!!opts.spoken)) talk(t('lists.viewOnly'))
+    go('', {}, opts.replace)
+    return
+  }
   if (parsed.kind === 'save') {
     await save(parsed.what, parsed.where, undefined, opts.spoken)
     go('', {}, opts.replace)

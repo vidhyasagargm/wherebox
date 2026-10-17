@@ -1,7 +1,7 @@
 {
   "name": "wherebox",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,12 +9,16 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
     "test": "vitest run",
-    "icons": "node scripts/icons.mjs"
+    "icons": "node scripts/icons.mjs",
+    "test:backend": "node --test backend/test/*.test.mjs",
+    "backend": "backend/.bin/pocketbase serve --dir backend/pb_data --migrationsDir backend/pb_migrations --hooksDir backend/pb_hooks",
+    "test:e2e": "node --test --test-concurrency=1 e2e/*.e2e.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^24.13.3",
+    "playwright": "^1.64.1",
     "sharp": "^0.35.5",
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",
@@ -25,7 +29,8 @@
   },
   "dependencies": {
     "@fontsource-variable/schibsted-grotesk": "^5.3.0",
-    "dexie": "^4.4.6"
+    "dexie": "^4.4.6",
+    "pocketbase": "^0.28.1"
   },
   "allowScripts": {
     "sharp@0.35.5": true

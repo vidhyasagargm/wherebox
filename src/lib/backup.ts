@@ -1,6 +1,7 @@
-import { db, type Item } from './db'
+import { changed, db, isAccountList, newId, visible, type Item } from './db'
+import { settings } from './settings.svelte'
 
-type BackupItem = Omit<Item, 'photo'> & { photo?: string }
+type BackupItem = Omit<Item, 'photo' | 'dirty' | 'deleted' | 'synced' | 'photoDirty' | 'photoName' | 'listId'> & { photo?: string }
 
 type Backup = { app: 'wherebox'; version: 1; exportedAt: number; items: BackupItem[]; rooms: string[] }
 
@@ -15,29 +16,36 @@ const toDataUrl = (blob: Blob) =>
 const fromDataUrl = async (url: string) => (await fetch(url)).blob()
 
 export async function exportBackup(): Promise<void> {
-  const items = await db.items.toArray()
+  const items = (await db.items.where('listId').equals(settings.activeList).toArray()).filter(visible)
   const rooms = (await db.rooms.toArray()).map((r) => r.name)
   const backup: Backup = {
     app: 'wherebox',
     version: 1,
     exportedAt: Date.now(),
-    items: await Promise.all(items.map(async ({ photo, ...rest }) => ({ ...rest, ...(photo ? { photo: await toDataUrl(photo) } : {}) }))),
+    items: await Promise.all(
+      items.map(async ({ photo, dirty: _d, deleted: _x, synced: _s, photoDirty: _p, photoName: _n, listId: _l, ...rest }) => ({
+        ...rest,
+        ...(photo ? { photo: await toDataUrl(photo) } : {}),
+      })),
+    ),
     rooms,
   }
   const name = `wherebox-backup-${new Date().toISOString().slice(0, 10)}.json`
-  const file = new File([JSON.stringify(backup)], name, { type: 'application/json' })
+  await saveFile(new File([JSON.stringify(backup)], name, { type: 'application/json' }))
+}
 
-  // On phones the share sheet lets people pick Files, Drive, email or a messenger.
+// Hands a file to the user: the share sheet on phones (Files, Drive, email…), a download elsewhere.
+export async function saveFile(file: File) {
   if (navigator.canShare?.({ files: [file] }) && matchMedia('(pointer: coarse)').matches) {
     try {
-      await navigator.share({ files: [file], title: name })
+      await navigator.share({ files: [file], title: file.name })
       return
     } catch (e) {
       if ((e as Error).name === 'AbortError') throw e
     }
   }
   const url = URL.createObjectURL(file)
-  const a = Object.assign(document.createElement('a'), { href: url, download: name })
+  const a = Object.assign(document.createElement('a'), { href: url, download: file.name })
   document.body.append(a)
   a.click()
   a.remove()
@@ -50,21 +58,33 @@ export async function readBackup(file: File): Promise<Backup> {
   return data as Backup
 }
 
-// Merges by id: restoring the same backup twice does not create duplicates.
+// Restores into the list on screen. Merges by id, so restoring the same backup twice adds no duplicates.
 export async function importBackup(backup: Backup): Promise<number> {
+  const listId = settings.activeList
+  const account = isAccountList(listId)
   const items: Item[] = []
   for (const raw of backup.items) {
     if (typeof raw.id !== 'string' || typeof raw.name !== 'string' || typeof raw.where !== 'string') continue
     const { photo, ...rest } = raw
+    const image = photo ? await fromDataUrl(photo) : undefined
     items.push({
       ...rest,
+      // Older backups used long ids the server doesn't accept.
+      id: /^[a-z0-9]{15}$/.test(rest.id) ? rest.id : newId(),
+      listId,
       history: Array.isArray(rest.history) ? rest.history : [],
-      ...(photo ? { photo: await fromDataUrl(photo) } : {}),
+      updatedAt: Date.now(),
+      dirty: account ? 1 : 0,
+      deleted: 0,
+      synced: 0,
+      photoDirty: image ? 1 : 0,
+      ...(image ? { photo: image } : {}),
     })
   }
   await db.transaction('rw', db.items, db.rooms, async () => {
     await db.items.bulkPut(items)
     await db.rooms.bulkPut((backup.rooms ?? []).filter((r) => typeof r === 'string').map((name) => ({ name })))
   })
+  changed(listId)
   return items.length
 }

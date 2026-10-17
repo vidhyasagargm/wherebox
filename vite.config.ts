@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
@@ -7,6 +8,10 @@ const { version } = JSON.parse(readFileSync(new URL('./package.json', import.met
 
 export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(version) },
+  // App unit tests only; the backend has its own runner (npm run test:backend).
+  test: { include: ['src/**/*.test.ts'] },
+  // In development, API calls go to a local PocketBase (npm run backend).
+  server: { proxy: { '/api': { target: process.env.WB_API_TARGET ?? 'http://127.0.0.1:8090', changeOrigin: false } } },
   plugins: [
     svelte(),
     VitePWA({

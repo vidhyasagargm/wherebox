@@ -14,10 +14,17 @@
   import Onboarding from './screens/Onboarding.svelte'
   import Places from './screens/Places.svelte'
   import Privacy from './screens/Privacy.svelte'
+  import SignIn from './screens/SignIn.svelte'
+  import Lists from './screens/Lists.svelte'
+  import ListDetail from './screens/ListDetail.svelte'
+  import Join from './screens/Join.svelte'
+  import DeleteAccount from './screens/DeleteAccount.svelte'
+  import Consent from './screens/Consent.svelte'
+  import { account, restoreSession } from './lib/account.svelte'
   import Settings from './screens/Settings.svelte'
   import Voice from './screens/Voice.svelte'
 
-  const screens = { find: Find, item: ItemDetail, confirm: Confirm, places: Places, settings: Settings, listen: Voice, welcome: Onboarding, privacy: Privacy }
+  const screens = { find: Find, item: ItemDetail, confirm: Confirm, places: Places, settings: Settings, listen: Voice, welcome: Onboarding, privacy: Privacy, signin: SignIn, lists: Lists, list: ListDetail, join: Join, terms: Privacy, 'delete-account': DeleteAccount }
   // On wide screens these open beside Home instead of replacing it.
   const sideBySide = new Set(['home', 'find', 'item', 'confirm'])
 
@@ -35,6 +42,7 @@
 
   onMount(() => {
     applyTheme()
+    restoreSession()
     const dark = matchMedia('(prefers-color-scheme: dark)')
     dark.addEventListener('change', applyTheme)
     const mq = matchMedia('(min-width: 900px)')
@@ -79,6 +87,8 @@
       <button type="button" class="btn btn-primary" onclick={() => location.reload()}>{t('storage.retry')}</button>
     </main>
   </div>
+{:else if account.needsConsent && name !== 'privacy' && name !== 'terms'}
+  <Consent />
 {:else if fullscreen}
   <Screen />
 {:else}

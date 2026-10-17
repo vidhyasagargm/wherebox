@@ -8,10 +8,23 @@
   import { go, route } from '../lib/router.svelte'
   import { saveSettings, settings } from '../lib/settings.svelte'
   import { canListen } from '../lib/speech'
-  import { data, handle } from '../lib/store.svelte'
+  import { activeListName, canEdit, data, handle } from '../lib/store.svelte'
   import { unlockTalk } from '../lib/talk'
+  import { account } from '../lib/account.svelte'
 
   let { compact = false }: { compact?: boolean } = $props()
+
+  const syncLabel = $derived(
+    account.expired
+      ? t('account.expired')
+      : account.status === 'offline'
+        ? t('account.offline')
+        : account.status === 'error'
+          ? t('account.error')
+          : account.status === 'syncing'
+            ? t('account.syncing')
+            : t('account.synced', { when: '' }).trim(),
+  )
 
   let text = $state('')
   let input: HTMLInputElement
@@ -58,6 +71,11 @@
   {#if !compact}
     <header class="head">
       <span class="brand"><Logo /><span>{t('appName')}</span></span>
+      {#if account.user}
+        <a class="sync" class:warn={account.expired || account.status === 'error'} href="#/settings" aria-label={`${t('account.status')}: ${syncLabel}`}>
+          <Icon name={account.status === 'offline' ? 'cloudOff' : account.status === 'syncing' ? 'sync' : account.expired || account.status === 'error' ? 'alert' : 'cloudCheck'} size={24} stroke={2} />
+        </a>
+      {/if}
       <button type="button" class="chip" aria-label={t('lang.switch')} onclick={toggleLang}>
         <span aria-hidden="true">{settings.lang === 'en' ? 'EN' : 'DE'} / {settings.lang === 'en' ? 'DE' : 'EN'}</span>
       </button>
@@ -65,7 +83,17 @@
   {/if}
 
   <section class="ask">
+    {#if account.user || data.lists.length}
+      <a class="list-switch" href="#/lists" aria-label={`${t('lists.current', { name: activeListName() })}. ${t('lists.switch')}`}>
+        <Icon name="list" size={20} stroke={2} />
+        <span>{activeListName()}</span>
+        <Icon name="down" size={18} stroke={2.4} />
+      </a>
+    {/if}
     <h1 tabindex="-1">{t('home.title')}</h1>
+    {#if !canEdit()}
+      <p class="view-only" role="status"><Icon name="eye" size={20} stroke={2} />{t('lists.viewOnlyBanner')}</p>
+    {/if}
     <form onsubmit={submit}>
       <label for="q" class="sr">{t('home.inputLabel')}</label>
       <div class="bar">
@@ -127,13 +155,60 @@
     justify-content: space-between;
     padding-top: 4px;
   }
+  .head {
+    gap: 8px;
+  }
   .brand {
+    flex: 1;
+
     display: flex;
     align-items: center;
     gap: 10px;
     font-weight: 800;
     font-size: 19px;
     letter-spacing: -0.01em;
+  }
+  .sync {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+  }
+  .sync.warn {
+    color: var(--danger);
+  }
+  .list-switch {
+    align-self: flex-start;
+    max-width: 100%;
+    min-height: 44px;
+    margin-bottom: -4px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .list-switch span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .view-only {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent-text);
   }
   .ask {
     display: flex;
