@@ -59,7 +59,7 @@ curl -s localhost:8080/api/health    # {"message":"API is healthy."…}
 Create the admin account (choose your own strong password; it never leaves the server):
 
 ```bash
-docker compose exec pocketbase pocketbase superuser upsert vidhyasagargsm@gmail.com '<strong password>' --dir /pb_data
+docker compose exec pocketbase pocketbase superuser upsert <your email> '<strong password>' --dir /pb_data
 ```
 
 ## 4. Cloudflare
