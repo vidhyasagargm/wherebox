@@ -20,7 +20,7 @@ ARG ANDROID_CERT_SHA256
 RUN if [ -n "$ANDROID_CERT_SHA256" ]; then mkdir -p dist/.well-known && printf '[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"fyi.sagar.wherebox","sha256_cert_fingerprints":["%s"]}}]\n' "$ANDROID_CERT_SHA256" > dist/.well-known/assetlinks.json; fi
 
 # --- Serve it: unprivileged nginx, listens on 8080 ---
-FROM nginxinc/nginx-unprivileged:1.29-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Fail the build if the nginx configuration is invalid, instead of failing on the server.
 RUN nginx -t
